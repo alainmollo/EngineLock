@@ -70,6 +70,9 @@ extern "C" {
 int bootState = 0;
 int dutyCycle = 0;
 
+// Property flag if remote data's was loaded
+bool readyFull = false;
+
 // Loop sequence identifier
 uint8_t errorCounter = 0;
 

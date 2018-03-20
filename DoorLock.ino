@@ -48,6 +48,10 @@ void setup() {
 	// Setup Rfid serial module
 	RfidManager.init();
 
+	// Led indicator turn off
+	pinMode(D4, OUTPUT);
+	digitalWrite(D4, HIGH);
+
 	// Output for engine locker
 	pinMode(D7, OUTPUT);
 	digitalWrite(D7, HIGH);
@@ -146,6 +150,9 @@ void SetUpNormalMode()
 
 			Logger.Log(F("Set DateTime from network"));
 		}
+
+		// Led indicator turn on
+		digitalWrite(D4, LOW);
 	}
 }
 
@@ -251,7 +258,17 @@ void loop()
 				if (!Rtc.IsDateTimeValid())
 					Logger.Error(F("RTC lost confidence in the DateTime"));
 
+				// Log and display day/time memory
 				display.printDateTime(Rtc);
+
+				// Flashing led if is not fully ready
+				if (!readyFull)
+				{
+					bool led = digitalRead(D4);
+					digitalWrite(D4, !led);
+				}
+				else
+					digitalWrite(D4, LOW);
 
 				if (Sim800.checkSMS())
 				{
@@ -292,6 +309,7 @@ void loop()
 					display.display();
 
 					Logger.Log(F("Sim800 lost"));
+
 					// Try to reconnect
 					Sim800.reset();
 				}

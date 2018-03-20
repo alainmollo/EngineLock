@@ -44,6 +44,9 @@
     <ClInclude Include="OtaManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="__vm\.EngineLock.vsarduino.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Logger.cpp">
@@ -72,7 +75,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ToDo.txt" />
     <Text Include="board.txt" />
   </ItemGroup>
 </Project>
