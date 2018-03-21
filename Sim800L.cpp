@@ -395,16 +395,18 @@ bool Sim800L::reset(void)
 	if (flag)
 	{
 		long count = 0;
+		byte lineCount = 0;
 		while (count++ < 15)
 		{
 			String serial = this->readString();
 			if (serial.length() > 0)
 			{
 				count = 0;
+				lineCount++;
 				Logger.Log(serial);
 			}
 			Logger.Log(String(count, DEC));
-			if (serial.indexOf(F("+CIEV")) != -1)
+			if (serial.indexOf(F("+CIEV")) != -1 || lineCount > 20)
 				break;
 		}
 	}
@@ -695,7 +697,8 @@ bool Sim800L::checkBootOk(void)
 bool Sim800L::checkConnectionOk(void)
 {
 	sendAtPlusCommand("CREG?");
-	if (_readSerial().indexOf(F("+CREG: 0,0")) != -1)
+	String result = _readSerial();
+	if (result.indexOf(F("+CREG: 0,0")) != -1 || result.equals(F("")))
 	{
 		Logger.Log(F("Module is not connected"));
 		return false;
