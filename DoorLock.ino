@@ -198,7 +198,7 @@ void loop()
 	// Else Normal Mode
 	else
 	{
-		if (Sim800.checkBootOk() && bootState < FAULT_CYCLE)
+		if (bootState < FAULT_CYCLE)
 		{
 			// Check if serial data arrived and send to TreatCommand
 			if (Serial.available())
@@ -270,7 +270,7 @@ void loop()
 				else
 					digitalWrite(D4, LOW);
 
-				if (Sim800.checkSMS())
+				if (Sim800.checkBootOk() && Sim800.checkSMS())
 				{
 					// Launch SMS treatment if present
 					if (!Sim800.ReadSMSTreatment(smsTreatCommand))
@@ -280,6 +280,11 @@ void loop()
 					}
 					else
 						errorCounter = 0;
+				}
+				else
+				{
+					if (errorCounter++ > MAX_SIM800_READING_ERROR)
+						bootState = FAULT_CYCLE;
 				}
 
 				// Reset the bootState value to 1
@@ -334,11 +339,11 @@ void loop()
 
 				Logger.Log(F("System fault"));
 
-				delay(10000);
+				delay(100);
 				ESP.restart();
 			}
 			else
-				if (!Sim800.checkBootOk())
+				if (!Sim800.checkBootOk() && ESP_RESTART_AFTER_SIM800_DEFAULT)
 				{
 					// Signal an error
 					display.clear();
@@ -346,10 +351,24 @@ void loop()
 					display.drawString(DISPLAY_WIDTH / 2, 40, F("Restarting...\n"));
 					display.display();
 
-					Logger.Log(F("Sim800 fault"));
+					Logger.Log(F("Sim800 fault restart"));
 
-					delay(10000);
+					delay(100);
 					ESP.restart();
+				}
+				else
+				{
+					// Signal an error
+					display.clear();
+					display.drawString(DISPLAY_WIDTH / 2, 20, F("Sim800 fault\n"));
+					display.drawString(DISPLAY_WIDTH / 2, 40, F("Reset...\n"));
+					display.display();
+
+					Logger.Log(F("Sim800 fault reset"));
+
+					delay(100);
+					Sim800.reset();
+					bootState = 1;
 				}
 	}
 }

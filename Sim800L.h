@@ -43,7 +43,7 @@
 #define MAX_TIME_OUT 1000
 
 // Max response await
-#define RESPONSE_COUNT_OUT 10
+#define RESPONSE_COUNT_OUT 5
 
 // Set debug mode
 //#define DEBUG_MODE_SET
