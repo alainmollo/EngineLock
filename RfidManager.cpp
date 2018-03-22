@@ -27,7 +27,6 @@ void RfidManagerClass::init()
 bool RfidManagerClass::CheckRfid(uint8 * rfidCard)
 {
 	String rfidStr;
-
 	// Check if data arrived from Rfid sensor
 	if (this->available())
 	{

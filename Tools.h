@@ -59,7 +59,6 @@ extern "C" {
 
 // Max retry number of SMS reading
 #define MAX_SMS_READING_ERROR 5
-#define MAX_SIM800_READING_ERROR 20
 
 // Wait while booting in 1/100 eme of seconds
 #define BOOT_DURATION 100

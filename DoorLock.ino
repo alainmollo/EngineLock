@@ -103,10 +103,25 @@ void setup() {
 	}
 }
 
+// Function launch while sim800 process is waiting
+void sim800WaitFunction(void)
+{
+	flashingLed();
+
+	// Check if Rfid Tag was detected
+	uint8 rfidCard[RFID_MAX_LEN];
+	if (RfidManager.CheckRfid(rfidCard))
+		CommandManager.rfidTreatCommand(& rfidCard[0]);
+}
+
 // Booting entry in normal mode
 void SetUpNormalMode()
 {
 	Logger.Log(F("Check Sim800 Init State"));
+	
+	// Register wait function to sim800 lib
+	Sim800.RegisterWaitOptionalFunction(&sim800WaitFunction);
+
 	// Initialization of Sim800L module
 	if (!Sim800.Init() && ESP_RESTART_AFTER_SIM800_DEFAULT)
 	{
@@ -249,7 +264,7 @@ void loop()
 					display.display();
 					delay(10);
 				}
-				CommandManager.rfidTreatCommand(&rfidCard[0]);
+				CommandManager.rfidTreatCommand(& rfidCard[0]);
 			}
 
 			// After a long cycle time (approximatively 1.5 second), we check date/time validity
@@ -261,14 +276,7 @@ void loop()
 				// Log and display day/time memory
 				display.printDateTime(Rtc);
 
-				// Flashing led if is not fully ready
-				if (!readyFull)
-				{
-					bool led = digitalRead(D4);
-					digitalWrite(D4, !led);
-				}
-				else
-					digitalWrite(D4, LOW);
+				flashingLed();
 
 				if (Sim800.checkBootOk() && Sim800.checkSMS())
 				{
@@ -280,11 +288,6 @@ void loop()
 					}
 					else
 						errorCounter = 0;
-				}
-				else
-				{
-					if (errorCounter++ > MAX_SIM800_READING_ERROR)
-						bootState = FAULT_CYCLE;
 				}
 
 				// Reset the bootState value to 1
@@ -329,7 +332,7 @@ void loop()
 			}
 		}
 		else
-			if (bootState == FAULT_CYCLE)
+			if (bootState == FAULT_CYCLE && ESP_RESTART_AFTER_SIM800_DEFAULT)
 			{
 				// Signal an error
 				display.clear();
@@ -371,4 +374,16 @@ void loop()
 					bootState = 1;
 				}
 	}
+}
+
+void flashingLed()
+{
+	// Flashing led if is not fully ready
+	if (!readyFull)
+	{
+		bool led = digitalRead(D4);
+		digitalWrite(D4, !led);
+	}
+	else
+		digitalWrite(D4, LOW);
 }

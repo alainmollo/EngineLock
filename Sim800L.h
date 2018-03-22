@@ -113,7 +113,10 @@ public:
 
 	// sms received and treatment function Prototype
 	typedef void(*smsTreatFunction)(smsReader * smsCommand); // type for conciseness
-	
+		
+	// function launch while waiting for sim response
+	typedef void(*optionalWaitFunction)(void); // type for conciseness
+
 	// Base constructor
 	Sim800L(void);
 
@@ -234,6 +237,9 @@ public:
 
 	// Read SMS arrived and launch SMS Treatment
 	bool ReadSMSTreatment(const smsTreatFunction &);
+
+	// Optional waiting response function launched
+	void RegisterWaitOptionalFunction(const optionalWaitFunction &);
 
 	// Receive SMS Datas from Sim800
 	//void ReceiveSMSData(const smsReceiveData &);

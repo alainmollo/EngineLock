@@ -25,6 +25,10 @@
 
 //================================================================================
 
+Sim800L::optionalWaitFunction persistantWaitFunction;
+
+//================================================================================
+
 bool Sim800L::smsReceived = false;
 
 // Base constructor
@@ -33,6 +37,7 @@ Sim800L::Sim800L(void)
 {
 	_ResetPin = RESET_PIN;
 	_InterruptPin = SIM800_INT_PIN_DEFAULT;
+	persistantWaitFunction = NULL;
 	SetUp(SIM800_BAUD_RATE_DEFAULT, SIM800_RX_PIN_DEFAULT);
 }
 
@@ -42,6 +47,7 @@ Sim800L::Sim800L(uint8_t receivePin, uint8_t transmitPin)
 {
 	_ResetPin = RESET_PIN;
 	_InterruptPin = SIM800_INT_PIN_DEFAULT;
+	persistantWaitFunction = NULL;
 	SetUp(SIM800_BAUD_RATE_DEFAULT, receivePin);
 }
 
@@ -51,6 +57,7 @@ Sim800L::Sim800L(uint8_t receivePin, uint8_t transmitPin, uint8_t resetPin)
 {
 	_ResetPin = resetPin;
 	_InterruptPin = SIM800_INT_PIN_DEFAULT;
+	persistantWaitFunction = NULL;
 	SetUp(SIM800_BAUD_RATE_DEFAULT, receivePin);
 }
 
@@ -60,6 +67,7 @@ Sim800L::Sim800L(uint8_t receivePin, uint8_t transmitPin, uint8_t resetPin, uint
 {
 	_ResetPin = resetPin;
 	_InterruptPin = interruptPin;
+	persistantWaitFunction = NULL;
 	SetUp(SIM800_BAUD_RATE_DEFAULT, receivePin);
 }
 
@@ -69,6 +77,7 @@ Sim800L::Sim800L(uint8_t receivePin, uint8_t transmitPin, uint8_t resetPin, uint
 {
 	_ResetPin = resetPin;
 	_InterruptPin = interruptPin;
+	persistantWaitFunction = NULL;
 	SetUp(baudrate, receivePin);
 }
 
@@ -250,11 +259,17 @@ String Sim800L::_readSerial(void)
 	int timeout = 0;
 	while (!this->available() && timeout++ < MAX_TIME_OUT)
 	{
+		// Call extra wait function
 		delay(10);
+		if (persistantWaitFunction != NULL)
+			(persistantWaitFunction)();
 	}
 	if (this->available())
 	{
 		_buffer = this->readString();
+
+		if (persistantWaitFunction != NULL)
+			(persistantWaitFunction)();
 
 		Logger.Log(F("Sim800 answer:"), false);
 		Logger.Log(_buffer);
@@ -375,7 +390,7 @@ bool Sim800L::waitResponseArray(String response[], byte count)
 // Public initialize method
 bool Sim800L::reset(void)
 {
-	sendAtPlusCommand("CFUN=0");
+	powerDownMode();
 
 	digitalWrite(_ResetPin, LOW);
 	delay(1000);
@@ -398,16 +413,29 @@ bool Sim800L::reset(void)
 		byte lineCount = 0;
 		while (count++ < 15)
 		{
-			String serial = this->readString();
-			if (serial.length() > 0)
+			int timeout = 0;
+			while (!this->available() && timeout++ < MAX_TIME_OUT)
 			{
-				count = 0;
-				lineCount++;
-				Logger.Log(serial);
+				// Call extra wait function
+				delay(10);
+				if (persistantWaitFunction != NULL)
+					(persistantWaitFunction)();
 			}
-			Logger.Log(String(count, DEC));
-			if (serial.indexOf(F("+CIEV")) != -1 || lineCount > 20)
-				break;
+			if (this->available())
+			{
+				String serial = this->readString();
+				if (serial.length() > 0)
+				{
+					count = 0;
+					lineCount++;
+					Logger.Log(serial);
+				}
+				Logger.Log(String(count, DEC));
+				if (serial.indexOf(F("+CIEV")) != -1 || lineCount > 20)
+					break;
+				if (persistantWaitFunction != NULL)
+					(persistantWaitFunction)();
+			}
 		}
 	}
 
@@ -426,7 +454,21 @@ bool Sim800L::sleepMode(void)
 bool Sim800L::powerDownMode(void)
 {
 	sendAtPlusCommand("CPOWD=1");
-	return waitOK();
+	int timeout = 0;
+	while (!this->available() && timeout++ < MAX_TIME_OUT)
+	{
+		// Call extra wait function
+		delay(10);
+		if (persistantWaitFunction != NULL)
+			(persistantWaitFunction)();
+	}
+	if (this->available())
+	{
+		String serial = this->readString();
+		return true;
+	}
+	else
+		return false;
 }
 
 // Put device in phone functionality mode
@@ -651,6 +693,12 @@ bool Sim800L::setOffLedFlash(void)
 uint8_t Sim800L::getReceivePin(void)
 {
 	return _ReceivePin;
+}
+
+// Register Optional waiting response function launched
+void Sim800L::RegisterWaitOptionalFunction(const optionalWaitFunction & waitFunction)
+{
+	persistantWaitFunction = waitFunction;
 }
 
 // Read SMS arrived and launch SMS Treatment
