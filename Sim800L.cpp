@@ -259,10 +259,9 @@ String Sim800L::_readSerial(void)
 	int timeout = 0;
 	while (!this->available() && timeout++ < MAX_TIME_OUT)
 	{
-		// Call extra wait function
-		delay(10);
 		if (persistantWaitFunction != NULL)
 			(persistantWaitFunction)();
+		delay(DELAY_TIME_OUT);
 	}
 	if (this->available())
 	{
@@ -303,7 +302,9 @@ void Sim800L::noWait(void)
 	int timeout = 0;
 	while (!this->available() && timeout++ < MAX_TIME_OUT)
 	{
-		delay(10);
+		if (persistantWaitFunction != NULL)
+			(persistantWaitFunction)();
+		delay(DELAY_TIME_OUT);
 	}
 	_buffer = F("");
 }
@@ -418,7 +419,7 @@ bool Sim800L::reset(void)
 			{
 				if (persistantWaitFunction != NULL)
 					(persistantWaitFunction)();
-				delay(10);
+				delay(DELAY_TIME_OUT);
 			}
 			if (this->available())
 			{
@@ -456,10 +457,9 @@ bool Sim800L::powerDownMode(void)
 	int timeout = 0;
 	while (!this->available() && timeout++ < MAX_TIME_OUT)
 	{
-		// Call extra wait function
-		delay(10);
 		if (persistantWaitFunction != NULL)
 			(persistantWaitFunction)();
+		delay(DELAY_TIME_OUT);
 	}
 	if (this->available())
 	{

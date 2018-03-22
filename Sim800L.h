@@ -41,6 +41,7 @@
 
 // SIM800 Max time out for response
 #define MAX_TIME_OUT 1000
+#define DELAY_TIME_OUT 1
 
 // Max response await
 #define RESPONSE_COUNT_OUT 5
