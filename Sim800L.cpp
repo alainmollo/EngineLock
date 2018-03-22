@@ -416,10 +416,9 @@ bool Sim800L::reset(void)
 			int timeout = 0;
 			while (!this->available() && timeout++ < MAX_TIME_OUT)
 			{
-				// Call extra wait function
-				delay(10);
 				if (persistantWaitFunction != NULL)
 					(persistantWaitFunction)();
+				delay(10);
 			}
 			if (this->available())
 			{
@@ -430,12 +429,12 @@ bool Sim800L::reset(void)
 					lineCount++;
 					Logger.Log(serial);
 				}
-				Logger.Log(String(count, DEC));
 				if (serial.indexOf(F("+CIEV")) != -1 || lineCount > 20)
 					break;
 				if (persistantWaitFunction != NULL)
 					(persistantWaitFunction)();
 			}
+			Logger.Log(String(count, DEC));
 		}
 	}
 
