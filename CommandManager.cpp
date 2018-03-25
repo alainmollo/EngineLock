@@ -62,6 +62,50 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 	}
 
 	// Reset the system
+	// ASKEND#
+	if (AnalyseSms(Message, F("ASK")))
+	{
+		this->askPlanning();
+		return true;
+	}
+
+	// Reset the system
+	// CLREND#440
+	if (AnalyseSms(Message, F("CLR")))
+	{
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2, "Clear Memory");
+		display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 + 20, "0 %");
+		display.display();
+
+		int adress = 0x0000;
+		for (int i = 12; i < 32767; i++)
+		{
+			uint8_t read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+			if (read != 0xFF)
+			{
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, 0xFF);
+				delay(10);
+			}
+			else
+				delay(5);
+			if (i % 100 == 99)
+			{
+				if (i % 1000 == 999)
+					Logger.Log(F("."),false);
+				display.clear();
+				display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2, "Clear Memory");
+				display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 + 20, String((i/327), DEC) + " %");
+				display.display();
+			}
+		}
+		Logger.Log(F(""));
+		Logger.Log(F("Clear ended"));
+
+		return true;
+	}
+
+	// Reset the system
 	// OTAEND#
 	if (AnalyseSms(Message, F("OTA")))
 	{
@@ -146,7 +190,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 					*addr += Message->charAt(ix);
 					ix++;
 				}
-				*addr += "00000000";
+				*addr += "FFFFFFFF";
 				int deciAdress = 16;
 
 				for (int j = 0; j < addr->length(); j = j + 2)
@@ -464,6 +508,9 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 		code[3] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
 		delay(10);
 
+		if ((code[0] == 0xFF && code[1] == 0xFF && code[2] == 0xFF && code[3] == 0xFF) && count > 1)
+			break;
+
 		Logger.Log(F("Memory chek : "), false);
 		Logger.Log(String(count, DEC), false);
 		Logger.Log(F(" , "), false);
@@ -472,9 +519,6 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 		Logger.Log(String(code[2], HEX), false);
 		Logger.Log(String(code[3], HEX));
 
-		if ((code[0] == 0 && code[1] == 0 && code[2] == 0 && code[3] == 0) && count > 1)
-			break;
-
 		if (code[0] == Q1 && code[1] == Q2 && code[2] == Q3 && code[3] == Q4)
 		{
 			result = true;
@@ -482,7 +526,7 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 		}
 	}
 
-	// if check is ok, write on eeprom the card number
+	// if check is ok, write on eeprom the card number for secure unlock
 	if (result)
 	{
 		deciAdress = 12;
@@ -495,6 +539,9 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 		delay(10);
 		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q4);
 		delay(10);
+
+		// Make a log entry with date/time to send to server
+
 	}
 	return result;
 }

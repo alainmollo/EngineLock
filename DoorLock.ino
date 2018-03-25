@@ -282,7 +282,7 @@ void loop()
 
 				flashingLed();
 
-				if (Sim800.checkBootOk() && Sim800.checkSMS())
+				while(Sim800.checkBootOk() && Sim800.checkSMS())
 				{
 					// Launch SMS treatment if present
 					if (!Sim800.ReadSMSTreatment(smsTreatCommand))
