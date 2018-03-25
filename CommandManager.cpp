@@ -1,11 +1,12 @@
 #include "CommandManager.h"
 
 // Default constructor
-CommandManagerClass::CommandManagerClass(Sim800L * _Sim800, RtcDS3231<TwoWire> * _Rtc, RfidManagerClass * _RfidManager)
+CommandManagerClass::CommandManagerClass(Sim800L * _Sim800, RtcDS3231<TwoWire> * _Rtc, RfidManagerClass * _RfidManager, bool & readFull)
 {
 	Sim800 = _Sim800;
 	Rtc = _Rtc;
 	RfidManager = _RfidManager;
+	readyFull = &readFull;
 }
 
 bool CommandManagerClass::TreatCommand(String * Message, String * Who, uint8_t From)
@@ -47,13 +48,6 @@ bool CommandManagerClass::TreatCommand(char * Message, char * Who, uint8_t From)
 
 bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t From)
 {
-	if (AnalyseSms(Message, F("MQTT")))
-	{
-		Logger.Log(F("MQTT Initialisation"));
-
-		return true;
-	}
-
 	// Reset the system
 	// RSETEND#533
 	if (AnalyseSms(Message, F("RSET")))
@@ -89,7 +83,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return ReplyToSender(F("OK"), Who, From);
 	}
 
-	// Store planning information
+	// Store data's informations in flash or eeprom
 	// DATA@0010$4A325E66@0020$55666A23END#1983
 	if (AnalyseSms(Message, F("DATA")))
 	{
@@ -118,22 +112,11 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 				}
 
 				int deciAdress = strtol(addr->c_str(), 0, 16);
-				bool selector = true;
-
-				// more than $2000 bank adress for internal eeprom (offset -> +12) else DS3231 eeprom
-				if (deciAdress > 8191)
-				{
-					deciAdress = deciAdress - 8180;
-					selector = false;
-				}
 
 				for (int j = 0; j < data->length(); j = j + 2)
 				{
 					uint8_t deciData = strtol((*data).substring(j, j + 2).c_str(), nullptr, 16);
-					if (selector)
-						EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, deciData); // datas less than 0x2000
-					else
-						EEPROM.write(deciAdress++, deciData); // datas adress upper or equal at 0x2000
+					EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, deciData);
 					delay(10);
 				}
 				delete addr;
@@ -143,12 +126,49 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return ReplyToSender(F("OK"), Who, From);
 	}
 
+	// Set planning cards authorized
+	// PLAN$4A325E6625AA11E0END#1983
+	if (AnalyseSms(Message, F("PLAN")))
+	{
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("Plan Setting ..."));
+		display.display();
+
+		int ix = 0;
+		while (ix < Message->length())
+		{
+			if (Message->charAt(ix) == '$')
+			{
+				ix++;
+				String * addr = new String();
+				while (ix < Message->length() && Message->charAt(ix) != '$')
+				{
+					*addr += Message->charAt(ix);
+					ix++;
+				}
+				*addr += "00000000";
+				int deciAdress = 16;
+
+				for (int j = 0; j < addr->length(); j = j + 2)
+				{
+					uint8_t deciData = strtol((*addr).substring(j, j + 2).c_str(), nullptr, 16);
+					EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, deciData);
+					delay(10);
+				}
+				delete addr;
+			}
+		}
+
+		*readyFull = true;
+		return ReplyToSender(F("OK"), Who, From);
+	}
+
 	// Send AT Command to Sim800
 	// SIM800@AT+CSQ?END#xxx
 	if (AnalyseSms(Message, F("SIM800")))
 		return SENDATCOMMAND(Message, Who, From);
 
-	// Dump planning informations
+	// Dump data's informations from flash or eeprom
 	// DUMP@0010END#782
 	if (AnalyseSms(Message, F("DUMP")))
 	{
@@ -168,23 +188,12 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			}
 
 			int deciAdress = strtol(addr->c_str(), 0, 16);
-			bool selector = true;
-
-			// more than $2000 bank adress for internal eeprom (offset -> +12) else DS3231 eeprom
-			if (deciAdress > 8191)
-			{
-				deciAdress = deciAdress - 8180;
-				selector = false;
-			}
 
 			String * output = new String();
 			for (int j = 0; j < 48; j++)
 			{
 				uint8_t result;
-				if (selector)
-					result = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress + j); // dump less than 0x2000
-				else
-					result = EEPROM.read(deciAdress + j); // dump adress upper or equal at 0x2000
+				result = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress + j); // dump less than 0x2000
 				delay(10);
 				if (result < 16)
 					*output += F("0");
@@ -222,7 +231,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			int adress = 0x0000;
 			for (int i = 0; i < 12; i++)
 			{
-				EEPROM.write(adress + i, Message->charAt(i));
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, Message->charAt(i));
 				delay(10);
 			}
 
@@ -235,6 +244,28 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		}
 		else
 			return false;
+	}
+
+	// Read phone number for Callback
+	// RCBKEND#1111
+	if (AnalyseSms(Message, F("RCBK")))
+	{
+		String retour;
+		// Set callback number eeprom storage adress
+		int adress = 0x0000;
+		for (int i = 0; i < 12; i++)
+		{
+			char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+			retour.concat(read);
+			delay(10);
+		}
+
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("Read CallBack Num"));
+		display.display();
+		display.lockDisplay();
+
+		return ReplyToSender(retour, Who, From);
 	}
 
 	// emulate rfid scan for card 45 5A 32 AA
@@ -297,8 +328,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 }
 
 // Decode SMS and check validity, return valid string or null
-// La forme correcte est :
-// PLAN301116END#814 par exemple
+// La forme correcte est par exemple :
 // RSETEND#533
 bool CommandManagerClass::AnalyseSms(String * message, String code)
 {
@@ -325,7 +355,10 @@ bool CommandManagerClass::AnalyseSms(String * message, String code)
 				if (atindex != -1)
 					*message = message->substring(atindex, endindex);
 				else
-					*message = message->substring(1, endindex);
+					*message = message->substring(code.length(), endindex);
+
+				Logger.Log(F("Message = "), false);
+				Logger.Log(*message);
 				return true;
 			}
 		}
@@ -367,7 +400,6 @@ void CommandManagerClass::rfidTreatCommand(uint8 * tagid, String * Who, uint8_t 
 		ReplyToSender(*toSend, Who, From);
 
 		delete toSend;
-
 		Logger.Log(F("Porte debloquee."));
 	}
 	else
@@ -392,8 +424,6 @@ bool CommandManagerClass::ReplyToSender(String reply, String * Who, uint8_t From
 		return true;
 	case COMMAND_FROM_SIM800:
 		return sendSms(Who, &reply);
-	case COMMAND_FROM_MQTT:
-		return true;
 	default:
 		return true;
 	}
@@ -410,7 +440,112 @@ bool CommandManagerClass::sendSms(String * callbackNumber, String * message)
 	return Sim800->sendSms(*callbackNumber, *message);
 }
 
+// Check if a card is authorized to unlock engine
 bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, byte Q3, byte Q4)
 {
-	return true;
+	Logger.Log(F("Check Authorization from : "), false);
+	Logger.Log(String(Q1, HEX), false);
+	Logger.Log(String(Q2, HEX), false);
+	Logger.Log(String(Q3, HEX), false);
+	Logger.Log(String(Q4, HEX));
+	bool result = false;
+
+	byte code[4];
+	byte count = 0;
+	int deciAdress = 12;
+	while (++count < 4)
+	{
+		code[0] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
+		delay(10);
+		code[1] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
+		delay(10);
+		code[2] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
+		delay(10);
+		code[3] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
+		delay(10);
+
+		Logger.Log(F("Memory chek : "), false);
+		Logger.Log(String(count, DEC), false);
+		Logger.Log(F(" , "), false);
+		Logger.Log(String(code[0], HEX), false);
+		Logger.Log(String(code[1], HEX), false);
+		Logger.Log(String(code[2], HEX), false);
+		Logger.Log(String(code[3], HEX));
+
+		if ((code[0] == 0 && code[1] == 0 && code[2] == 0 && code[3] == 0) && count > 1)
+			break;
+
+		if (code[0] == Q1 && code[1] == Q2 && code[2] == Q3 && code[3] == Q4)
+		{
+			result = true;
+			break;
+		}
+	}
+
+	// if check is ok, write on eeprom the card number
+	if (result)
+	{
+		deciAdress = 12;
+
+		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q1);
+		delay(10);
+		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q2);
+		delay(10);
+		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q3);
+		delay(10);
+		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q4);
+		delay(10);
+	}
+	return result;
+}
+
+// Send SMS Planning request to callback user (manager)
+bool CommandManagerClass::askPlanning()
+{
+	Logger.Log("Ask Planning to : ", false);
+	String * callNumber = new String();
+	int adress = 0x0000;
+	for (int i = 0; i < 12; i++)
+	{
+		char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+		(*callNumber).concat(read);
+		delay(10);
+	}
+	Logger.Log(*callNumber);
+	String * logdisp = new String(F("ASKPLAN@"));
+
+	RtcDateTime dt = Rtc->GetDateTime();
+
+	char datestring[11];
+	char timestring[9];
+
+	snprintf_P(datestring,
+		countof(datestring),
+		PSTR("%02u/%02u/%04u"),
+		dt.Day(),
+		dt.Month(),
+		dt.Year());
+	snprintf_P(timestring,
+		countof(timestring),
+		PSTR("%02u:%02u:%02u"),
+		dt.Hour(),
+		dt.Minute(),
+		dt.Second());
+
+	*logdisp += datestring;
+	*logdisp += F(";");
+	*logdisp += timestring;
+	*logdisp += F("#");
+
+	int diezeindex = logdisp->indexOf(F("#"));
+	String dieze = logdisp->substring(diezeindex + 1);
+	int crcmessage = dieze.toInt();
+	int crc = 0;
+	for (int i = 0; i < diezeindex; i++)
+	{
+		crc += logdisp->charAt(i);
+	}
+
+	*logdisp += String(crc);
+	return sendSms(callNumber, logdisp);
 }

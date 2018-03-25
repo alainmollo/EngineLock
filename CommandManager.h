@@ -28,15 +28,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Command sender declaration
 #define COMMAND_FROM_SERIAL   0
 #define COMMAND_FROM_SIM800   1
-#define COMMAND_FROM_MQTT     2
-#define COMMAND_FROM_INTERNAL 3
+#define COMMAND_FROM_INTERNAL 2
 
 #include "Logger.h"
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include "RtcDS3231.h"
 #include "EepromDs3231.h"
-#include "EEPROM.h"
 #include "SSD1306.h"
 #include "Sim800L.h"
 #include "RfidManager.h"
@@ -54,6 +52,9 @@ protected:
 
 	// Setup Rfid manager class
 	RfidManagerClass * RfidManager;
+	
+	// Property flag if remote data's was loaded
+	bool * readyFull;
 
 	// Real treatment
 	bool LaunchCommand(String *, String *, uint8_t);
@@ -69,7 +70,7 @@ protected:
 	bool checkAuthorization(RtcDateTime, byte, byte, byte, byte);
 public:
 	// Default constructor
-	CommandManagerClass(Sim800L *, RtcDS3231<TwoWire> *, RfidManagerClass *);
+	CommandManagerClass(Sim800L *, RtcDS3231<TwoWire> *, RfidManagerClass *, bool &);
 
 	// Launch command treatment
 	bool TreatCommand(String *, String *, uint8_t);
@@ -88,5 +89,8 @@ public:
 
 	// Launch rfid treatment
 	void rfidTreatCommand(uint8 *, String *, uint8_t);
+
+	// Send SMS Planning request to callback user (manager)
+	bool askPlanning();
 };
 #endif

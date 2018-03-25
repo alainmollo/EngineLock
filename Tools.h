@@ -73,6 +73,9 @@ int dutyCycle = 0;
 // Property flag if remote data's was loaded
 bool readyFull = false;
 
+// Store last refresh of authorized card from server
+uint8_t lastRefreshAuthCard = 255;
+
 // Loop sequence identifier
 uint8_t errorCounter = 0;
 
@@ -86,5 +89,5 @@ RtcDS3231<TwoWire> Rtc(Wire);
 RfidManagerClass RfidManager;
 
 // Command Manager for all entries (Serial, Sim800, EspWifi...)
-CommandManagerClass CommandManager(&Sim800, &Rtc, &RfidManager);
+CommandManagerClass CommandManager(&Sim800, &Rtc, &RfidManager, readyFull);
 #endif

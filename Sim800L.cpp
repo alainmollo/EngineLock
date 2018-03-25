@@ -745,15 +745,15 @@ bool Sim800L::checkConnectionOk(void)
 {
 	sendAtPlusCommand("CREG?");
 	String result = _readSerial();
-	if (result.indexOf(F("+CREG: 0,0")) != -1 || result.equals(F("")))
-	{
-		Logger.Log(F("Module is not connected"));
-		return false;
-	}
-	else
+	if (result.indexOf(F("+CREG:")) != -1 && result.indexOf(F("+CREG: 0,0")) == -1)
 	{
 		Logger.Log(F("Module is connected"));
 		return true;
+	}
+	else
+	{
+		Logger.Log(F("Module is not connected"));
+		return false;
 	}
 }
 

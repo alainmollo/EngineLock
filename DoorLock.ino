@@ -48,10 +48,6 @@ void setup() {
 	// Setup Rfid serial module
 	RfidManager.init();
 
-	// Led indicator turn off
-	pinMode(D4, OUTPUT);
-	digitalWrite(D4, HIGH);
-
 	// Output for engine locker
 	pinMode(D7, OUTPUT);
 	digitalWrite(D7, HIGH);
@@ -83,6 +79,9 @@ void setup() {
 		delay(10);
 		count++;
 	}
+
+	pinMode(D4, OUTPUT);
+	digitalWrite(D4, HIGH);
 
 	// Ota Booting
 	if (bootState == 0)
@@ -267,6 +266,11 @@ void loop()
 				CommandManager.rfidTreatCommand(& rfidCard[0]);
 			}
 
+			if (readyFull && (bootState == (MAX_CYCLE / 3) || bootState == (2 * MAX_CYCLE / 3)))
+			{
+				flashingLed();
+			}
+
 			// After a long cycle time (approximatively 1.5 second), we check date/time validity
 			if (bootState != FAULT_CYCLE && bootState++ > MAX_CYCLE)
 			{
@@ -327,7 +331,18 @@ void loop()
 					{
 						if (errorCounter++ > MAX_SMS_READING_ERROR)
 							bootState = FAULT_CYCLE;
-					}
+					}					
+				}
+			}
+
+			if (dutyCycle > MAX_DUTY_CYCLE || lastRefreshAuthCard == 255)
+			{
+				uint8_t hour = Rtc.GetDateTime().Hour();
+				if (lastRefreshAuthCard == 255 || hour != lastRefreshAuthCard)
+				{
+					Logger.Log("Asking authorized cards...");
+					if (Sim800.checkConnectionOk() && CommandManager.askPlanning())
+						lastRefreshAuthCard = hour;
 				}
 			}
 		}
@@ -378,8 +393,11 @@ void loop()
 
 void flashingLed()
 {
+	bool unlockEngine = false;
+	if (digitalRead(D7) == LOW)
+		unlockEngine = true;
 	// Flashing led if is not fully ready
-	if (!readyFull)
+	if (!unlockEngine)
 	{
 		bool led = digitalRead(D4);
 		digitalWrite(D4, !led);

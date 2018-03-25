@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // 0 => No Log
 // 1 => Error Log
 // 2 => Verbose Log
-#define ACTIVELOG 2
+#define ACTIVELOG 0
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
