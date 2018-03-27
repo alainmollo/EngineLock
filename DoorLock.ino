@@ -110,14 +110,14 @@ void sim800WaitFunction(void)
 	// Check if Rfid Tag was detected
 	uint8 rfidCard[RFID_MAX_LEN];
 	if (RfidManager.CheckRfid(rfidCard))
-		CommandManager.rfidTreatCommand(& rfidCard[0]);
+		CommandManager.rfidTreatCommand(&rfidCard[0]);
 }
 
 // Booting entry in normal mode
 void SetUpNormalMode()
 {
 	Logger.Log(F("Check Sim800 Init State"));
-	
+
 	// Register wait function to sim800 lib
 	Sim800.RegisterWaitOptionalFunction(&sim800WaitFunction);
 
@@ -168,6 +168,8 @@ void SetUpNormalMode()
 		// Led indicator turn on
 		digitalWrite(D4, LOW);
 	}
+
+	dutyCycle = MAX_DUTY_CYCLE - 2;
 }
 
 // Redirect SMS Message to Command Treatment
@@ -263,7 +265,7 @@ void loop()
 					display.display();
 					delay(10);
 				}
-				CommandManager.rfidTreatCommand(& rfidCard[0]);
+				CommandManager.rfidTreatCommand(&rfidCard[0]);
 			}
 
 			if (readyFull && (bootState == (MAX_CYCLE / 3) || bootState == (2 * MAX_CYCLE / 3)))
@@ -282,7 +284,7 @@ void loop()
 
 				flashingLed();
 
-				while(Sim800.checkBootOk() && Sim800.checkSMS())
+				while (Sim800.checkBootOk() && Sim800.checkSMS())
 				{
 					// Launch SMS treatment if present
 					if (!Sim800.ReadSMSTreatment(smsTreatCommand))
@@ -306,12 +308,9 @@ void loop()
 			{
 				RfidManager.clearBuffer();
 			}
-
+			
 			if (dutyCycle > MAX_DUTY_CYCLE)
 			{
-				dutyCycle = 0;
-				Logger.Log(F("MAX DUTY CYCLE DETECTED"));
-
 				if (!Sim800.checkConnectionOk())
 				{
 					// Signal an error
@@ -331,19 +330,29 @@ void loop()
 					{
 						if (errorCounter++ > MAX_SMS_READING_ERROR)
 							bootState = FAULT_CYCLE;
-					}					
+					}
 				}
 			}
 
-			if (dutyCycle > MAX_DUTY_CYCLE || lastRefreshAuthCard == 255)
+			if (dutyCycle > MAX_DUTY_CYCLE)
 			{
 				uint8_t hour = Rtc.GetDateTime().Hour();
-				if (lastRefreshAuthCard == 255 || hour != lastRefreshAuthCard)
+				if (hour != lastRefreshAuthCard)
 				{
-					Logger.Log("Asking authorized cards...");
-					if (Sim800.checkConnectionOk() && CommandManager.askPlanning())
-						lastRefreshAuthCard = hour;
+					if (Sim800.checkConnectionOk())
+					{
+						Logger.Log(F("Asking authorized cards..."));
+						if (CommandManager.askPlanning())
+							lastRefreshAuthCard = hour;
+					}
 				}
+			}
+
+			// Reset ducyCycle property when Cycle overflow
+			if (dutyCycle > MAX_DUTY_CYCLE)
+			{
+				dutyCycle = 0;
+				Logger.Log(F("MAX DUTY CYCLE DETECTED"));
 			}
 		}
 		else

@@ -45,6 +45,7 @@
 
 // Max response await
 #define RESPONSE_COUNT_OUT 5
+#define START_COUNT_SIM 10
 
 // Set debug mode
 //#define DEBUG_MODE_SET

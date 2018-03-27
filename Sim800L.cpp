@@ -412,7 +412,7 @@ bool Sim800L::reset(void)
 	{
 		long count = 0;
 		byte lineCount = 0;
-		while (count++ < 15)
+		while (count++ < START_COUNT_SIM)
 		{
 			int timeout = 0;
 			while (!this->available() && timeout++ < MAX_TIME_OUT)
