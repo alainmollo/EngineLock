@@ -157,6 +157,14 @@ bool Sim800L::Init(void)
 	return result;
 }
 
+void Sim800L::AssignInterruptLater(uint8_t interruptPin)
+{
+	pinMode(_InterruptPin, INPUT);
+	delay(10);
+	attachInterrupt(digitalPinToInterrupt(_InterruptPin), ringinterrupt, CHANGE);
+	delay(10);
+}
+
 // Send command to module (optimized)
 void Sim800L::sendCommand(String & command, bool cr = true)
 {
@@ -515,8 +523,7 @@ bool Sim800L::sendSms(String & number, String & text)
 	noWait();
 	sendCommand((char)26);
 
-	noWait();
-	return true;
+	return waitOK();
 }
 
 // Private method for jump in buffer posititon
@@ -779,5 +786,6 @@ bool Sim800L::checkSMS(void)
 // Sim800L hardwware ring signal interruption, just to wake up arduino when SMS received
 void Sim800L::ringinterrupt(void)
 {
+	Logger.Log(F("Ring..."));
 	smsReceived = true;
 }

@@ -30,6 +30,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define COMMAND_FROM_SIM800   1
 #define COMMAND_FROM_INTERNAL 2
 
+// Memory map
+#define PLANNING_ADRESS 0x0104
+#define LAST_CARD_ADRESS 0x0100
+#define CALLBACK_ADRESS 0x0000
+#define NUMBER_ADRESS 0x000C
+
+#define CARD_SIZE 0x04
+#define NUMBER_SIZE 0x0C
+
 #include "Logger.h"
 #include <SoftwareSerial.h>
 #include <Wire.h>

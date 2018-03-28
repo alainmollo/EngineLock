@@ -79,23 +79,22 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		display.display();
 
 		int adress = 0x0000;
-		for (int i = 12; i < 32767; i++)
+		for (int i = 0; i < 32767; i++)
 		{
 			uint8_t read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
 			if (read != 0xFF)
 			{
-				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, 0xFF);
-				delay(10);
-			}
-			else
 				delay(5);
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, 0xFF);
+			}
+			delay(5);
 			if (i % 100 == 99)
 			{
 				if (i % 1000 == 999)
-					Logger.Log(F("."),false);
+					Logger.Log(F("."), false);
 				display.clear();
 				display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2, "Clear Memory");
-				display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 + 20, String((i/327), DEC) + " %");
+				display.drawString(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 + 20, String((i / 327), DEC) + " %");
 				display.display();
 			}
 		}
@@ -191,7 +190,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 					ix++;
 				}
 				*addr += "FFFFFFFF";
-				int deciAdress = 16;
+				int deciAdress = PLANNING_ADRESS;
 
 				for (int j = 0; j < addr->length(); j = j + 2)
 				{
@@ -269,11 +268,11 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 	// CLBK+33614490515END#1111
 	if (AnalyseSms(Message, F("CLBK")))
 	{
-		if (Message->length() == 12)
+		if (Message->length() == NUMBER_SIZE)
 		{
 			// Set callback number eeprom storage adress
-			int adress = 0x0000;
-			for (int i = 0; i < 12; i++)
+			int adress = CALLBACK_ADRESS;
+			for (int i = 0; i < NUMBER_SIZE; i++)
 			{
 				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, Message->charAt(i));
 				delay(10);
@@ -290,14 +289,39 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			return false;
 	}
 
+	// Set phone number for Callback
+	// CNUM+33614490515END#1111
+	if (AnalyseSms(Message, F("CNUM")))
+	{
+		if (Message->length() == NUMBER_SIZE)
+		{
+			// Set callback number eeprom storage adress
+			int adress = NUMBER_ADRESS;
+			for (int i = 0; i < NUMBER_SIZE; i++)
+			{
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, Message->charAt(i));
+				delay(10);
+			}
+
+			display.clear();
+			display.drawString(DISPLAY_WIDTH / 2, 20, F("Set Number Num"));
+			display.display();
+			display.lockDisplay();
+
+			return ReplyToSender(F("OK"), Who, From);
+		}
+		else
+			return false;
+	}
+
 	// Read phone number for Callback
 	// RCBKEND#1111
 	if (AnalyseSms(Message, F("RCBK")))
 	{
 		String retour;
 		// Set callback number eeprom storage adress
-		int adress = 0x0000;
-		for (int i = 0; i < 12; i++)
+		int adress = CALLBACK_ADRESS;
+		for (int i = 0; i < NUMBER_SIZE; i++)
 		{
 			char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
 			retour.concat(read);
@@ -306,6 +330,28 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 
 		display.clear();
 		display.drawString(DISPLAY_WIDTH / 2, 20, F("Read CallBack Num"));
+		display.display();
+		display.lockDisplay();
+
+		return ReplyToSender(retour, Who, From);
+	}
+
+	// Read phone number for Callback
+	// RNUMEND#1111
+	if (AnalyseSms(Message, F("RNUM")))
+	{
+		String retour;
+		// Set callback number eeprom storage adress
+		int adress = NUMBER_ADRESS;
+		for (int i = 0; i < NUMBER_SIZE; i++)
+		{
+			char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+			retour.concat(read);
+			delay(10);
+		}
+
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("Read Number Num"));
 		display.display();
 		display.lockDisplay();
 
@@ -354,7 +400,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			Logger.Log(F(","), false);
 			Logger.Log(String(Q4, HEX));
 
-			uint8 * tag = new uint8[4];
+			uint8 * tag = new uint8[CARD_SIZE];
 			tag[0] = Q1;
 			tag[1] = Q2;
 			tag[2] = Q3;
@@ -476,12 +522,39 @@ bool CommandManagerClass::ReplyToSender(String reply, String * Who, uint8_t From
 // Send message to callback number
 bool CommandManagerClass::sendSms(String * callbackNumber, String * message)
 {
-	Logger.Log(F("sending Sms to "), false);
-	Logger.Log(*callbackNumber, false);
-	Logger.Log(F(" : "), false);
-	Logger.Log(*message);
+	String retour;
+	// Set callback number eeprom storage adress
+	int adress = NUMBER_ADRESS;
+	for (int i = 0; i < NUMBER_SIZE; i++)
+	{
+		char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+		retour.concat(read);
+		delay(10);
+	}
 
-	return Sim800->sendSms(*callbackNumber, *message);
+	if (callbackNumber->indexOf(retour) != -1)
+	{
+		Logger.Log(F("Change callback number!"));
+		retour = "";
+		int adress = CALLBACK_ADRESS;
+		for (int i = 0; i < NUMBER_SIZE; i++)
+		{
+			char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+			retour.concat(read);
+			delay(10);
+		}
+
+		return Sim800->sendSms(retour, *message);
+	}
+	else
+	{
+		Logger.Log(F("sending Sms to "), false);
+		Logger.Log(*callbackNumber, false);
+		Logger.Log(F(" : "), false);
+		Logger.Log(*message);
+
+		return Sim800->sendSms(*callbackNumber, *message);
+	}
 }
 
 // Check if a card is authorized to unlock engine
@@ -494,10 +567,10 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 	Logger.Log(String(Q4, HEX));
 	bool result = false;
 
-	byte code[4];
+	byte code[CARD_SIZE];
 	byte count = 0;
-	int deciAdress = 12;
-	while (++count < 4)
+	int deciAdress = LAST_CARD_ADRESS;
+	while (++count < CARD_SIZE)
 	{
 		code[0] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
 		delay(10);
@@ -529,7 +602,7 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 	// if check is ok, write on eeprom the card number for secure unlock
 	if (result)
 	{
-		deciAdress = 12;
+		deciAdress = LAST_CARD_ADRESS;
 
 		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q1);
 		delay(10);
@@ -551,8 +624,8 @@ bool CommandManagerClass::askPlanning()
 {
 	Logger.Log("Ask Planning to : ", false);
 	String * callNumber = new String();
-	int adress = 0x0000;
-	for (int i = 0; i < 12; i++)
+	int adress = CALLBACK_ADRESS;
+	for (int i = 0; i < NUMBER_SIZE; i++)
 	{
 		char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
 		(*callNumber).concat(read);

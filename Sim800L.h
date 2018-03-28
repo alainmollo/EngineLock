@@ -164,6 +164,9 @@ public:
 	// Send AT+ command to module (optimized)
 	void sendAtPlusCommand(const char *, bool);
 
+	// Can assign interrupt pin later
+	void AssignInterruptLater(uint8_t interruptPin);
+
 	// Wait OK response
 	bool waitOK(void);
 

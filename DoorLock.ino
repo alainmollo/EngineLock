@@ -48,10 +48,6 @@ void setup() {
 	// Setup Rfid serial module
 	RfidManager.init();
 
-	// Output for engine locker
-	pinMode(D7, OUTPUT);
-	digitalWrite(D7, HIGH);
-
 	// Set D3 as input pull up for detecting key press action
 	// at start up to select normal mode or OTA
 	pinMode(D3, INPUT);
@@ -80,6 +76,11 @@ void setup() {
 		count++;
 	}
 
+	// Output for engine locker
+	pinMode(D7, OUTPUT);
+	digitalWrite(D7, HIGH);
+
+	// Turn light off
 	pinMode(D4, OUTPUT);
 	digitalWrite(D4, HIGH);
 
@@ -170,6 +171,7 @@ void SetUpNormalMode()
 	}
 
 	dutyCycle = MAX_DUTY_CYCLE - 2;
+	Sim800.AssignInterruptLater(D3);
 }
 
 // Redirect SMS Message to Command Treatment
