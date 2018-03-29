@@ -168,6 +168,9 @@ void SetUpNormalMode()
 
 		// Led indicator turn on
 		digitalWrite(D4, LOW);
+
+		delete dtetme;
+		delete dte;
 	}
 
 	dutyCycle = MAX_DUTY_CYCLE - 2;

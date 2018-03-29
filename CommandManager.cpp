@@ -9,11 +9,52 @@ CommandManagerClass::CommandManagerClass(Sim800L * _Sim800, RtcDS3231<TwoWire> *
 	readyFull = &readFull;
 }
 
+// Launch command treatment if callnumber is include in 3 authorized numbers
 bool CommandManagerClass::TreatCommand(String * Message, String * Who, uint8_t From)
 {
 	Logger.Log(F("Command was launched by "), false);
 	Logger.Log(*Who);
 	Logger.Log(*Message);
+
+	String retour;
+	if (From == COMMAND_FROM_SIM800)
+	{
+		int adress = CALLBACK_ADRESS;
+		for (int i = 0; i < NUMBER_SIZE; i++)
+		{
+			char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+			retour.concat(read);
+			delay(10);
+		}
+		if (Who->indexOf(retour) == -1)
+		{
+			retour = "";
+			adress = NUMBER_ADRESS;
+			for (int i = 0; i < NUMBER_SIZE; i++)
+			{
+				char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+				retour.concat(read);
+				delay(10);
+			}
+			if (Who->indexOf(retour) == -1)
+			{
+				retour = "";
+				adress = MANAGER_ADRESS;
+				for (int i = 0; i < NUMBER_SIZE; i++)
+				{
+					char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+					retour.concat(read);
+					delay(10);
+				}
+				if (Who->indexOf(retour) == -1)
+				{
+					Logger.Log(F("Non authorized number."));
+					return false;
+				}
+			}
+		}
+	}
+
 	bool result = LaunchCommand(Message, Who, From);
 	if (!result)
 		ReplyToSender(F("CMD ERROR"), Who, From);
@@ -264,7 +305,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			return false;
 	}
 
-	// Set phone number for Callback
+	// Set phone number for Callback (SERVER)
 	// CLBK+33614490515END#1111
 	if (AnalyseSms(Message, F("CLBK")))
 	{
@@ -289,7 +330,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			return false;
 	}
 
-	// Set phone number for Callback
+	// Set phone number of sim card to not reply to itself
 	// CNUM+33614490515END#1111
 	if (AnalyseSms(Message, F("CNUM")))
 	{
@@ -314,7 +355,32 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			return false;
 	}
 
-	// Read phone number for Callback
+	// Set phone number of manager (ME)
+	// CNUM+33614490515END#1111
+	if (AnalyseSms(Message, F("CMNG")))
+	{
+		if (Message->length() == NUMBER_SIZE)
+		{
+			// Set callback number eeprom storage adress
+			int adress = MANAGER_ADRESS;
+			for (int i = 0; i < NUMBER_SIZE; i++)
+			{
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, adress + i, Message->charAt(i));
+				delay(10);
+			}
+
+			display.clear();
+			display.drawString(DISPLAY_WIDTH / 2, 20, F("Set MAnager Num"));
+			display.display();
+			display.lockDisplay();
+
+			return ReplyToSender(F("OK"), Who, From);
+		}
+		else
+			return false;
+	}
+
+	// Read phone number for Callback (SERVER)
 	// RCBKEND#1111
 	if (AnalyseSms(Message, F("RCBK")))
 	{
@@ -336,7 +402,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return ReplyToSender(retour, Who, From);
 	}
 
-	// Read phone number for Callback
+	// Read phone number of sim card to not reply to itself
 	// RNUMEND#1111
 	if (AnalyseSms(Message, F("RNUM")))
 	{
@@ -352,6 +418,28 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 
 		display.clear();
 		display.drawString(DISPLAY_WIDTH / 2, 20, F("Read Number Num"));
+		display.display();
+		display.lockDisplay();
+
+		return ReplyToSender(retour, Who, From);
+	}
+
+	// Read phone number of manager (ME)
+	// RNUMEND#1111
+	if (AnalyseSms(Message, F("RMNG")))
+	{
+		String retour;
+		// Set callback number eeprom storage adress
+		int adress = MANAGER_ADRESS;
+		for (int i = 0; i < NUMBER_SIZE; i++)
+		{
+			char read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress + i);
+			retour.concat(read);
+			delay(10);
+		}
+
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("Read Manager Num"));
 		display.display();
 		display.lockDisplay();
 
@@ -632,6 +720,8 @@ bool CommandManagerClass::askPlanning()
 		delay(10);
 	}
 	Logger.Log(*callNumber);
+	delete callNumber;
+
 	String * logdisp = new String(F("ASKPLAN@"));
 
 	RtcDateTime dt = Rtc->GetDateTime();
@@ -667,5 +757,8 @@ bool CommandManagerClass::askPlanning()
 	}
 
 	*logdisp += String(crc);
-	return sendSms(callNumber, logdisp);
+	bool result = sendSms(callNumber, logdisp);
+	delete logdisp;
+
+	return result;
 }

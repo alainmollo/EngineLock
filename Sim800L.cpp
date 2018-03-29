@@ -402,9 +402,9 @@ bool Sim800L::reset(void)
 	powerDownMode();
 
 	digitalWrite(_ResetPin, LOW);
-	delay(1000);
+	delay(100);
 	digitalWrite(_ResetPin, HIGH);
-	delay(1000);
+	delay(100);
 
 	Logger.Log(F("Wait Sim800  ready ..."));
 
@@ -462,6 +462,7 @@ bool Sim800L::sleepMode(void)
 bool Sim800L::powerDownMode(void)
 {
 	sendAtPlusCommand("CPOWD=1");
+	delay(100);
 	int timeout = 0;
 	while (!this->available() && timeout++ < MAX_TIME_OUT)
 	{

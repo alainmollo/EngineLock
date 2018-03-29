@@ -20,6 +20,8 @@ bool CommandManagerClass::SENDATCOMMAND(String * Message, String * Who, uint8_t 
 		Logger.Log(*addr);
 
 		String result = Sim800->sendWaitCommand(addr->c_str());
+		delete addr;
+
 		return ReplyToSender(result, Who, From);
 	}
 	else
