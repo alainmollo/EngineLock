@@ -190,13 +190,14 @@ void smsTreatCommand(Sim800L::smsReader * smsCommand)
 // Loop process to survey every tasks
 void loop()
 {
-	if (otaManager.CheckState())
+	if (otaManager.CheckOtaState())
 		bootState = 0;
 
 	// If bootState == 0, we choose OTA firmware upgrading
 	if (bootState == 0)
 	{
 		otaManager.Refresh();
+
 		// Check if serial data arrived and send to TreatCommand
 		if (Serial.available())
 		{
@@ -219,6 +220,8 @@ void loop()
 	// Else Normal Mode
 	else
 	{
+		otaManager.Refresh();
+
 		if (bootState < FAULT_CYCLE)
 		{
 			// Check if serial data arrived and send to TreatCommand
@@ -313,7 +316,7 @@ void loop()
 			{
 				RfidManager.clearBuffer();
 			}
-			
+
 			if (dutyCycle > MAX_DUTY_CYCLE)
 			{
 				if (!Sim800.checkConnectionOk())

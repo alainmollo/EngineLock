@@ -25,11 +25,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define HOSTNAME "ESP8266-OTA-"
 #define VERSION "1.00"
 
+#define SSID_PSWD_ADDRESS 0x0024
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <WiFiUdp.h>
+#include "EepromDs3231.h"
 #include <ArduinoOTA.h>
 
 #include "displayManager.h"
@@ -38,21 +41,41 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 class OtaManagerClass
 {
 protected:
-	bool State;
+	bool OtaState;
+	bool WebState;
 
+	String ssid = "";
+	String password = "";
+
+	// Web returning function in Web mode
 	static void handleRoot();
 
+	// Launch Access Point mode
 	void AccessPointOTA(void);
 
+	// Launch Appairing mode
 	void AppearingOTA(void);
+
+	// Set http registration routes
+	void registerRoute(void);
 public:
+	// Constructor
 	OtaManagerClass(void);
 
+	// Refresh OTA downloading process when OTA mode was launched
 	void Refresh(void);
 
+	// Set OTA mode with appairing or acces point style
 	void Ota(bool);
 
-	bool CheckState(void);
+	// Set Web mode appairing or acces point style
+	void Web(bool);
+
+	// Check if OTA mode was launched
+	bool CheckOtaState(void);
+
+	// Check if WEB mode was launched
+	bool CheckWebState(void);
 };
 
 extern OtaManagerClass otaManager;

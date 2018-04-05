@@ -145,13 +145,40 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return true;
 	}
 
-	// Reset the system
-	// OTAEND#
-	if (AnalyseSms(Message, F("OTA")))
+	// Launch OTA Mode in access point
+	// OTAAPEND#
+	if (AnalyseSms(Message, F("OTAAP")))
+	{
+		otaManager.Ota(false);
+
+		return ReplyToSender(F("OTA AP was launched..."), Who, From);
+	}
+
+	// Launch OTA Mode in station
+	// OTASTAEND#
+	if (AnalyseSms(Message, F("OTASTA")))
 	{
 		otaManager.Ota(true);
 
-		return ReplyToSender(F("OTA was launched..."), Who, From);
+		return ReplyToSender(F("OTA STA was launched..."), Who, From);
+	}
+
+	// Launch Web Mode
+	// WEBAPEND#
+	if (AnalyseSms(Message, F("WEBAP")))
+	{
+		otaManager.Web(false);
+
+		return ReplyToSender(F("WEB was launched..."), Who, From);
+	}
+
+	// Launch Web Mode
+	// WEBSTAEND#
+	if (AnalyseSms(Message, F("WEBSTA")))
+	{
+		otaManager.Web(true);
+
+		return ReplyToSender(F("WEB was launched..."), Who, From);
 	}
 
 	// Unlock door
@@ -497,6 +524,62 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 			return false;
 	}
 
+	// Store data's informations in flash or eeprom
+	// WIFI@SSID~PASSWORDEND#...
+	if (AnalyseSms(Message, F("WIFI")))
+	{
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("Wifi Setting ..."));
+		display.display();
+
+		int ix = 0;
+		while (ix < Message->length())
+		{
+			if (Message->charAt(ix) == '@')
+			{
+				ix++;
+				String * addr = new String();
+				while (ix < Message->length() && Message->charAt(ix) != '~')
+				{
+					*addr += Message->charAt(ix);
+					ix++;
+				}
+				ix++;
+				String * data = new String();
+				while (ix < Message->length() && Message->charAt(ix) != '@')
+				{
+					*data += Message->charAt(ix);
+					ix++;
+				}
+
+				Logger.Log(F("Set Wifi : "),false);
+				Logger.Log(*addr, false);
+				Logger.Log(F("/"), false);
+				Logger.Log(*data);
+
+				int deciAdress = SSID_PSWD_ADDRESS;
+
+				for (int j = 0; j < data->length(); j++)
+				{
+					EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, addr->charAt(j));
+					delay(10);
+				}
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, 0xFF);
+				delay(10);
+				for (int j = 0; j < data->length(); j++)
+				{
+					EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, data->charAt(j));
+					delay(10);
+				}
+				EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, 0xFF);
+				delay(10);
+				delete addr;
+				delete data;
+			}
+		}
+		return ReplyToSender(F("OK"), Who, From);
+	}
+
 	return false;
 }
 
@@ -654,6 +737,8 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, uint8 * tagid)
 	byte code[RFID_MAX_LEN];
 	byte count = 0;
 	int deciAdress = LAST_CARD_ADRESS;
+
+	// we are checking less or equal than 4 cards on planning buffer
 	while (++count < 4)
 	{
 		for (int i = 0; i < RFID_MAX_LEN; i++)
@@ -704,8 +789,8 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, uint8 * tagid)
 			delay(10);
 		}
 
-		// Make a log entry with date/time to send to server
-
+		// Make a log entry with date/time to send to server if tag is authorized
+		logOneEntry(now, tagid);
 	}
 	return result;
 }
@@ -763,4 +848,10 @@ bool CommandManagerClass::askPlanning()
 	delete logdisp;
 
 	return result;
+}
+
+// Make an entry log for authorized tag
+void CommandManagerClass::logOneEntry(RtcDateTime now, uint8 * tagid)
+{
+	//TODO
 }
