@@ -31,13 +31,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define COMMAND_FROM_INTERNAL 2
 
 // Memory map
-#define PLANNING_ADRESS 0x0104
+#define PLANNING_ADRESS 0x010C
 #define LAST_CARD_ADRESS 0x0100
 #define CALLBACK_ADRESS 0x0000
 #define NUMBER_ADRESS 0x000C
 #define MANAGER_ADRESS 0x0018
 
-#define CARD_SIZE 0x04
 #define NUMBER_SIZE 0x0C
 
 #include "Logger.h"
@@ -77,7 +76,7 @@ protected:
 
 	bool SENDATCOMMAND(String *, String *, uint8_t);
 
-	bool checkAuthorization(RtcDateTime, byte, byte, byte, byte);
+	bool checkAuthorization(RtcDateTime, uint8 *);
 public:
 	// Default constructor
 	CommandManagerClass(Sim800L *, RtcDS3231<TwoWire> *, RfidManagerClass *, bool &);

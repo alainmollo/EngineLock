@@ -197,12 +197,16 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 
 				int deciAdress = strtol(addr->c_str(), 0, 16);
 
+				Logger.Log(F("Split:"), false);
 				for (int j = 0; j < data->length(); j = j + 2)
 				{
+					Logger.Log((*data).substring(j, j + 2), false);
+					Logger.Log(F(","), false);
 					uint8_t deciData = strtol((*data).substring(j, j + 2).c_str(), nullptr, 16);
 					EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, deciData);
 					delay(10);
 				}
+				Logger.Log(F(""));
 				delete addr;
 				delete data;
 			}
@@ -230,15 +234,24 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 					*addr += Message->charAt(ix);
 					ix++;
 				}
-				*addr += "FFFFFFFF";
-				int deciAdress = PLANNING_ADRESS;
+				
+				// Fill the end of sequence with 0xFF
+				for (int j = 0; j < RFID_MAX_LEN; j++)
+				{
+					*addr += "FF";
+				}
 
+				int deciAdress = PLANNING_ADRESS;
+				Logger.Log(F("Split:"), false);
 				for (int j = 0; j < addr->length(); j = j + 2)
 				{
+					Logger.Log((*addr).substring(j, j + 2), false);
+					Logger.Log(F(","), false);
 					uint8_t deciData = strtol((*addr).substring(j, j + 2).c_str(), nullptr, 16);
 					EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, deciData);
 					delay(10);
 				}
+				Logger.Log(F(""));
 				delete addr;
 			}
 		}
@@ -446,53 +459,35 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return ReplyToSender(retour, Who, From);
 	}
 
-	// emulate rfid scan for card 45 5A 32 AA
-	// RFID@455A32AAEND#111
+	// emulate rfid scan for card 45 5A 32 AA ...
+	// RFID@455A32AA...END#111
 	if (AnalyseSms(Message, F("RFID")))
 	{
 		int ix = 0;
 		if (Message->charAt(ix) == '@')
 		{
 			ix++;
-			String * s5 = new String();
+			String * datas = new String();
 			while (ix < Message->length())
 			{
-				*s5 += Message->charAt(ix);
+				*datas += Message->charAt(ix);
 				ix++;
 			}
+			Logger.Log("Emulate Rfid : ",false);
 
-			String * x = new String();
-			char * Qstr = new char[3];
-			*(Qstr + 2) = 0;
-			*x = s5->substring(0, 2);
-			strncpy(Qstr, x->c_str(), 2);
-			byte Q1 = strtol(Qstr, 0, 16);
-			*x = s5->substring(2, 4);
-			strncpy(Qstr, x->c_str(), 2);
-			byte Q2 = strtol(Qstr, 0, 16);
-			*x = s5->substring(4, 6);
-			strncpy(Qstr, x->c_str(), 2);
-			byte Q3 = strtol(Qstr, 0, 16);
-			*x = s5->substring(6);
-			strncpy(Qstr, x->c_str(), 2);
-			byte Q4 = strtol(Qstr, 0, 16);
-			delete s5;
-			delete Qstr;
-			delete x;
+			uint8 * tag = new uint8[RFID_MAX_LEN];
+			byte pos = 0x00;
+			for (int j = 0; j < RFID_MAX_LEN * 2; j = j + 2)
+			{
+				if (j >= (datas->length() - 1))
+					break;
+				uint8_t deciData = strtol((*datas).substring(j, j + 2).c_str(), nullptr, 16);
+				*(tag + pos++) = deciData;
+				Logger.Log(String(deciData, HEX), false);
+				Logger.Log(F(","), false);
+			}
+			Logger.Log(F(""));
 
-			Logger.Log(String(Q1, HEX), false);
-			Logger.Log(F(","), false);
-			Logger.Log(String(Q2, HEX), false);
-			Logger.Log(F(","), false);
-			Logger.Log(String(Q3, HEX), false);
-			Logger.Log(F(","), false);
-			Logger.Log(String(Q4, HEX));
-
-			uint8 * tag = new uint8[CARD_SIZE];
-			tag[0] = Q1;
-			tag[1] = Q2;
-			tag[2] = Q3;
-			tag[3] = Q4;
 			rfidTreatCommand(tag, Who, From);
 			delete tag;
 
@@ -557,7 +552,7 @@ void CommandManagerClass::rfidTreatCommand(uint8 * tagid, String * Who, uint8_t 
 	Logger.Log(F("rfidTreatCommand"));
 
 	RtcDateTime now = Rtc->GetDateTime();
-	if (checkAuthorization(now, tagid[0], tagid[1], tagid[2], tagid[3]))
+	if (checkAuthorization(now, tagid))
 	{
 		// Unlock engine
 		digitalWrite(D7, LOW);
@@ -569,10 +564,10 @@ void CommandManagerClass::rfidTreatCommand(uint8 * tagid, String * Who, uint8_t 
 		display.lockDisplay();
 
 		String * toSend = new String(F("TRACE:"));
-		toSend->concat(String(tagid[0], HEX));
-		toSend->concat(String(tagid[1], HEX));
-		toSend->concat(String(tagid[2], HEX));
-		toSend->concat(String(tagid[3], HEX));
+		for (int j = 0; j < RFID_MAX_LEN; j++)
+		{
+			toSend->concat(String(*(tagid+j), HEX));
+		}
 		toSend->toUpperCase();
 
 		ReplyToSender(*toSend, Who, From);
@@ -646,41 +641,52 @@ bool CommandManagerClass::sendSms(String * callbackNumber, String * message)
 }
 
 // Check if a card is authorized to unlock engine
-bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, byte Q3, byte Q4)
+bool CommandManagerClass::checkAuthorization(RtcDateTime now, uint8 * tagid)
 {
 	Logger.Log(F("Check Authorization from : "), false);
-	Logger.Log(String(Q1, HEX), false);
-	Logger.Log(String(Q2, HEX), false);
-	Logger.Log(String(Q3, HEX), false);
-	Logger.Log(String(Q4, HEX));
+	for (int j = 0; j < RFID_MAX_LEN; j++)
+	{
+		Logger.Log(String(*(tagid + j), HEX), false);
+	}
+	Logger.Log(F(""));
 	bool result = false;
 
-	byte code[CARD_SIZE];
+	byte code[RFID_MAX_LEN];
 	byte count = 0;
 	int deciAdress = LAST_CARD_ADRESS;
-	while (++count < CARD_SIZE)
+	while (++count < 4)
 	{
-		code[0] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
-		delay(10);
-		code[1] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
-		delay(10);
-		code[2] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
-		delay(10);
-		code[3] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
-		delay(10);
+		for (int i = 0; i < RFID_MAX_LEN; i++)
+		{
+			code[i] = EepromDs3231Class::i2c_eeprom_read_byte(0x57, deciAdress++);
+			delay(10);
+		}
 
-		if ((code[0] == 0xFF && code[1] == 0xFF && code[2] == 0xFF && code[3] == 0xFF) && count > 1)
+		byte flag = 0;
+		for (int i = 0; i < RFID_MAX_LEN; i++)
+		{
+			if (code[i] == 0xFF)
+				flag++;
+		}
+		if (flag == RFID_MAX_LEN && count > 1)
 			break;
 
 		Logger.Log(F("Memory chek : "), false);
 		Logger.Log(String(count, DEC), false);
 		Logger.Log(F(" , "), false);
-		Logger.Log(String(code[0], HEX), false);
-		Logger.Log(String(code[1], HEX), false);
-		Logger.Log(String(code[2], HEX), false);
-		Logger.Log(String(code[3], HEX));
+		for (int i = 0; i < RFID_MAX_LEN; i++)
+		{
+			Logger.Log(String(code[i], HEX), false);
+		}
+		Logger.Log(F(""));
 
-		if (code[0] == Q1 && code[1] == Q2 && code[2] == Q3 && code[3] == Q4)
+		flag = 0;
+		for (int i = 0; i < RFID_MAX_LEN; i++)
+		{
+			if (code[i] == *(tagid + i))
+				flag++;
+		}
+		if (flag == RFID_MAX_LEN)
 		{
 			result = true;
 			break;
@@ -692,14 +698,11 @@ bool CommandManagerClass::checkAuthorization(RtcDateTime now, byte Q1, byte Q2, 
 	{
 		deciAdress = LAST_CARD_ADRESS;
 
-		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q1);
-		delay(10);
-		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q2);
-		delay(10);
-		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q3);
-		delay(10);
-		EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, Q4);
-		delay(10);
+		for (int i = 0; i < RFID_MAX_LEN; i++)
+		{
+			EepromDs3231Class::i2c_eeprom_write_byte(0x57, deciAdress++, *(tagid + i));
+			delay(10);
+		}
 
 		// Make a log entry with date/time to send to server
 
@@ -720,8 +723,6 @@ bool CommandManagerClass::askPlanning()
 		delay(10);
 	}
 	Logger.Log(*callNumber);
-	delete callNumber;
-
 	String * logdisp = new String(F("ASKPLAN@"));
 
 	RtcDateTime dt = Rtc->GetDateTime();
@@ -758,6 +759,7 @@ bool CommandManagerClass::askPlanning()
 
 	*logdisp += String(crc);
 	bool result = sendSms(callNumber, logdisp);
+	delete callNumber;
 	delete logdisp;
 
 	return result;
