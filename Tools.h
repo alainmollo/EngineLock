@@ -88,6 +88,9 @@ RtcDS3231<TwoWire> Rtc(Wire);
 // Setup Rfid manager class
 RfidManagerClass RfidManager;
 
+// OTA Manager instanciate
+OtaManagerClass otaManager;
+
 // Command Manager for all entries (Serial, Sim800, EspWifi...)
-CommandManagerClass CommandManager(&Sim800, &Rtc, &RfidManager, readyFull);
+CommandManagerClass CommandManager(&Sim800, &Rtc, &RfidManager, &otaManager, readyFull);
 #endif

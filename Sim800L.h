@@ -114,7 +114,7 @@ public:
 	};
 
 	// sms received and treatment function Prototype
-	typedef void(*smsTreatFunction)(smsReader * smsCommand); // type for conciseness
+	typedef void(*smsTreatFunction)(smsReader *); // type for conciseness
 		
 	// function launch while waiting for sim response
 	typedef void(*optionalWaitFunction)(void); // type for conciseness

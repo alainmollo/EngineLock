@@ -1,12 +1,30 @@
 #include "CommandManager.h"
 
 // Default constructor
-CommandManagerClass::CommandManagerClass(Sim800L * _Sim800, RtcDS3231<TwoWire> * _Rtc, RfidManagerClass * _RfidManager, bool & readFull)
+CommandManagerClass::CommandManagerClass(Sim800L * _Sim800, RtcDS3231<TwoWire> * _Rtc, RfidManagerClass * _RfidManager, OtaManagerClass * _otaManager, bool & readFull)
 {
 	Sim800 = _Sim800;
 	Rtc = _Rtc;
 	RfidManager = _RfidManager;
 	readyFull = &readFull;
+	otaManager = _otaManager;
+}
+
+String CommandManagerClass::TreatOtaCommand(String * Message)
+{
+	Logger.Log(F("TreatCommand from OTA"));
+	String * tmpstr = new String(F("WEB"));
+	
+	// Call commandmanager instance of external definition of CommandManager.h declared on Tools.h
+	CommandManager.TreatCommand(Message, tmpstr, COMMAND_FROM_WEB);
+
+	return CommandManager._webBuffer;
+}
+
+void CommandManagerClass::registerOtaTreatCommand(void)
+{
+	Logger.Log(F("Register TreatOtaCommand"));
+	otaManager->registerTreatFunction(TreatOtaCommand);
 }
 
 // Launch command treatment if callnumber is include in 3 authorized numbers
@@ -102,7 +120,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return true;
 	}
 
-	// Reset the system
+	// Ask the planning
 	// ASKEND#
 	if (AnalyseSms(Message, F("ASK")))
 	{
@@ -142,14 +160,14 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		Logger.Log(F(""));
 		Logger.Log(F("Clear ended"));
 
-		return true;
+		return ReplyToSender(F("Memory was cleared..."), Who, From);;
 	}
 
 	// Launch OTA Mode in access point
 	// OTAAPEND#
 	if (AnalyseSms(Message, F("OTAAP")))
 	{
-		otaManager.Ota(false);
+		otaManager->Ota(false);
 
 		return ReplyToSender(F("OTA AP was launched..."), Who, From);
 	}
@@ -158,7 +176,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 	// OTASTAEND#
 	if (AnalyseSms(Message, F("OTASTA")))
 	{
-		otaManager.Ota(true);
+		otaManager->Ota(true);
 
 		return ReplyToSender(F("OTA STA was launched..."), Who, From);
 	}
@@ -167,7 +185,7 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 	// WEBAPEND#
 	if (AnalyseSms(Message, F("WEBAP")))
 	{
-		otaManager.Web(false);
+		otaManager->Web(false);
 
 		return ReplyToSender(F("WEB was launched..."), Who, From);
 	}
@@ -176,19 +194,28 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 	// WEBSTAEND#
 	if (AnalyseSms(Message, F("WEBSTA")))
 	{
-		otaManager.Web(true);
+		otaManager->Web(true);
 
 		return ReplyToSender(F("WEB was launched..."), Who, From);
 	}
 
-	// Unlock door
-	// 0 -> 3 ex: UNLK1END#100
+	// Unlock engine
+	// UNLKEND#100
 	if (AnalyseSms(Message, F("UNLK")))
 	{
-		double  x = Message->toFloat();
-		uint8_t toLock = pow(2, x);
 		// Unlock engine
 		digitalWrite(D7, LOW);
+		delay(50);
+
+		return ReplyToSender(F("OK"), Who, From);
+	}
+
+	// Lock engine
+	// LOCKEND#100
+	if (AnalyseSms(Message, F("LOCK")))
+	{
+		// Unlock engine
+		digitalWrite(D7, HIGH);
 		delay(50);
 
 		return ReplyToSender(F("OK"), Who, From);
@@ -680,6 +707,9 @@ bool CommandManagerClass::ReplyToSender(String reply, String * Who, uint8_t From
 		return true;
 	case COMMAND_FROM_SIM800:
 		return sendSms(Who, &reply);
+	case COMMAND_FROM_WEB:
+		setWebBuffer(reply);
+		return true;
 	default:
 		return true;
 	}
@@ -848,6 +878,11 @@ bool CommandManagerClass::askPlanning()
 	delete logdisp;
 
 	return result;
+}
+
+void CommandManagerClass::setWebBuffer(String answer)
+{
+	_webBuffer = answer;
 }
 
 // Make an entry log for authorized tag

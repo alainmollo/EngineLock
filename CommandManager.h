@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define COMMAND_FROM_SERIAL   0
 #define COMMAND_FROM_SIM800   1
 #define COMMAND_FROM_INTERNAL 2
-#define COMMAND_FROM_WIFI 3
+#define COMMAND_FROM_WEB 3
 
 // Memory map
 #define PLANNING_ADRESS 0x010C
@@ -64,7 +64,10 @@ protected:
 
 	// Setup Rfid manager class
 	RfidManagerClass * RfidManager;
-	
+
+	// Ota manager instance
+	OtaManagerClass * otaManager;
+
 	// Property flag if remote data's was loaded
 	bool * readyFull;
 
@@ -88,9 +91,15 @@ protected:
 
 	// Log entry for unlock operation
 	void logOneEntry(RtcDateTime now, uint8 * tagid);
+
+	// Store answer for web command
+	void setWebBuffer(String answer);
 public:
+	// Answer web buffer
+	String _webBuffer;
+
 	// Default constructor
-	CommandManagerClass(Sim800L *, RtcDS3231<TwoWire> *, RfidManagerClass *, bool &);
+	CommandManagerClass(Sim800L *, RtcDS3231<TwoWire> *, RfidManagerClass *, OtaManagerClass *, bool &);
 
 	// Launch command treatment
 	bool TreatCommand(String *, String *, uint8_t);
@@ -112,5 +121,13 @@ public:
 
 	// Send SMS Planning request to callback user (manager)
 	bool askPlanning();
+
+	// Treat command function for OTA
+	static String TreatOtaCommand(String *);
+
+	// Attach Ota TreatCommand
+	void registerOtaTreatCommand(void);
 };
+
+extern CommandManagerClass CommandManager;
 #endif

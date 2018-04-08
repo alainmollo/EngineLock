@@ -2,6 +2,54 @@
 
 const char* mySsid = "ESP8266";
 
+OtaManagerClass::otaTreatfunction * _theFunction;
+
+const char INDEX_HTML[] =
+"<!DOCTYPE HTML>"
+"<html>"
+"<head>"
+"<meta name = \"viewport\" content = \"width = device-width, initial-scale = 1.0, maximum-scale = 1.0, user-scalable=0\">"
+"<title>DoorLock Command Line</title>"
+"<style>"
+"\"body { background-color: #808080; font-family: Arial, Helvetica, Sans-Serif; Color: #000000; }\""
+"</style>"
+"</head>"
+"<body>"
+"<h1 style=\"color:blue;\">DoorLock Command Line</h1>"
+"<FORM action=\"/\" method=\"post\">"
+"<P>"
+"Command<br>"
+"<INPUT type=\"text\" name=\"COMMAND\" size=\"80\"><BR>"
+"<INPUT type=\"submit\" value=\"Send\"> <INPUT type=\"reset\">"
+"</P>"
+"</FORM>"
+"</body>"
+"</html>";
+
+const char ANSWER_1_HTML[] =
+"<!DOCTYPE HTML>"
+"<html>"
+"<head>"
+"<meta name = \"viewport\" content = \"width = device-width, initial-scale = 1.0, maximum-scale = 1.0, user-scalable=0\">"
+"<title>DoorLock Command Line</title>"
+"<style>"
+"\"body { background-color: #808080; font-family: Arial, Helvetica, Sans-Serif; Color: #000000; }\""
+"</style>"
+"</head>"
+"<body>"
+"<h1 style=\"color:blue;\">DoorLock Command Line</h1>"
+"<FORM action=\"/\" method=\"post\">"
+"<P>"
+"Command<br>"
+"<INPUT type=\"text\" name=\"COMMAND\" size=\"80\"><BR>"
+"<INPUT type=\"submit\" value=\"Send\"> <INPUT type=\"reset\">"
+"</P>"
+"</FORM>";
+
+const char ANSWER_2_HTML[] =
+"</body>"
+"</html>";
+
 IPAddress ip(192, 168, 11, 4);
 IPAddress gateway(192, 168, 11, 1);
 IPAddress subnet(255, 255, 255, 0);
@@ -13,6 +61,7 @@ OtaManagerClass::OtaManagerClass()
 {
 	OtaState = false;
 	WebState = false;
+	_theFunction = NULL;
 }
 
 // Return Ota State
@@ -43,9 +92,29 @@ void OtaManagerClass::Refresh()
 
 // Response for root web site of server
 void OtaManagerClass::handleRoot() {
-	Logger.Log(F("Ota handle Root"));
+	String CommandLine;
 
-	server.send(200, "text/plain", "hello from esp8266!");
+	Logger.Log(F("Command from Web"));
+	CommandLine = server.arg("COMMAND");
+	if (CommandLine.length() == 0)
+	{
+		server.send(200, "text/html", INDEX_HTML);
+	}
+	else
+	{
+		String result;
+		Logger.Log(CommandLine.c_str());
+		
+		if (_theFunction != NULL)
+			result = (*_theFunction)(&CommandLine);
+
+		Logger.Log(F("Answer to Web:"), false);
+		Logger.Log(result.c_str());
+
+		String response = ANSWER_1_HTML + String(F("<h2>")) + result + String(F("</h2>")) + ANSWER_2_HTML;
+
+		server.send(200, "text/html", response);
+	}
 }
 
 // Prepare OTA in Access Point Mode
@@ -143,6 +212,15 @@ void OtaManagerClass::AppearingOTA()
 
 // Ota mechanism
 void OtaManagerClass::Ota(bool fromCommand) {
+	if (WiFi.isConnected())
+	{
+		Logger.Log(F("Always connected..."));
+		Logger.Log(F("Reset connection !"));
+		WiFi.disconnect(true);
+		delay(1000);
+		WiFi.begin();
+	}
+
 	// Read configuration
 	int adress = SSID_PSWD_ADDRESS;
 	char read;
@@ -209,8 +287,14 @@ void OtaManagerClass::Ota(bool fromCommand) {
 // Set Web Mode
 void OtaManagerClass::Web(bool fromCommand)
 {
-	// Cut wifi for reduce energy consumption
-	WiFi.mode(WIFI_AP_STA);
+	if (WiFi.isConnected())
+	{
+		Logger.Log(F("Always connected..."));
+		Logger.Log(F("Reset connection !"));
+		WiFi.disconnect(true);
+		delay(1000);
+		WiFi.begin();
+	}
 
 	// Read configuration
 	int adress = SSID_PSWD_ADDRESS;
@@ -226,12 +310,11 @@ void OtaManagerClass::Web(bool fromCommand)
 		delay(10);
 	}
 
-	String hostname(HOSTNAME);
-	hostname += String(ESP.getChipId(), HEX);
-	WiFi.hostname(hostname);
-
 	if (fromCommand)
 	{
+		Logger.Log(F("Web Station"));
+		WiFi.mode(WIFI_STA);
+
 		Logger.Log(F("SSID/PSWD:"), false);
 		Logger.Log(ssid.c_str(), false);
 		Logger.Log(F("/"), false);
@@ -248,8 +331,6 @@ void OtaManagerClass::Web(bool fromCommand)
 		display.drawString(64, 30, ssid);
 		display.display();
 		delay(10);
-
-		WiFi.mode(WIFI_STA);
 
 		WiFi.begin(ssid.c_str(), password.c_str());
 		// Wait for connection
@@ -275,10 +356,12 @@ void OtaManagerClass::Web(bool fromCommand)
 	}
 	else
 	{
-		WiFi.mode(WIFI_AP);
-
 		Logger.Log(F("Web Access Point"));
 		WiFi.mode(WIFI_AP);
+
+		String hostname(HOSTNAME);
+		hostname += String(ESP.getChipId(), HEX);
+		WiFi.hostname(hostname);
 
 		WiFi.softAPConfig(ip, gateway, subnet);
 		boolean apsuccess = WiFi.softAP(mySsid, password.c_str());
@@ -342,12 +425,13 @@ void OtaManagerClass::Web(bool fromCommand)
 
 void OtaManagerClass::registerRoute()
 {
-	server.on("/", OtaManagerClass::handleRoot);
+	server.on("/", handleRoot);
 	server.on("/version", []() {
-		server.send(200, "text/plain", "DoorLock version ");
-		server.send(200, "text/plain", String(VERSION).c_str());
+		server.send(200, "text/plain", "DoorLock version 1.0");
 	});
 }
 
-// OTA Manager instanciate
-OtaManagerClass otaManager;
+void OtaManagerClass::registerTreatFunction(otaTreatfunction & theFunction)
+{
+	_theFunction = &theFunction;
+}

@@ -175,6 +175,8 @@ void SetUpNormalMode()
 
 	dutyCycle = MAX_DUTY_CYCLE - 2;
 	Sim800.AssignInterruptLater(D3);
+
+	CommandManager.registerOtaTreatCommand();
 }
 
 // Redirect SMS Message to Command Treatment

@@ -171,7 +171,7 @@ void Sim800L::sendCommand(String & command, bool cr = true)
 	ESP.wdtFeed();
 
 	Logger.Log(F("sendCommand : "), false);
-	Logger.Log(command);
+	Logger.Log(command.c_str());
 
 	this->print(command);
 	delay(50);
@@ -205,7 +205,7 @@ String Sim800L::sendWaitCommand(String & command)
 	ESP.wdtFeed();
 
 	Logger.Log(F("sendCommand : "), false);
-	Logger.Log(command);
+	Logger.Log(command.c_str());
 
 	this->print(command);
 	delay(50);
@@ -279,7 +279,7 @@ String Sim800L::_readSerial(void)
 			(persistantWaitFunction)();
 
 		Logger.Log(F("Sim800 answer:"), false);
-		Logger.Log(_buffer);
+		Logger.Log(_buffer.c_str());
 
 		return _buffer;
 	}
@@ -436,7 +436,7 @@ bool Sim800L::reset(void)
 				{
 					count = 0;
 					lineCount++;
-					Logger.Log(serial);
+					Logger.Log(serial.c_str());
 				}
 				if (serial.indexOf(F("+CIEV")) != -1 || lineCount > 20)
 					break;
@@ -573,7 +573,7 @@ Sim800L::smsReader * Sim800L::readSms(uint8_t index)
 				Logger.Log("who = " + whoSend);
 				Logger.Log("when = " + whenSend);
 				Logger.Log(F("sms reading:"), false);
-				Logger.Log(_buffer);
+				Logger.Log(_buffer.c_str());
 
 				return result;
 			}
@@ -773,7 +773,7 @@ bool Sim800L::checkSMS(void)
 		String sim800data = this->readString();
 
 		Logger.Log(F("checkSMS:"), false);
-		Logger.Log(sim800data);
+		Logger.Log(sim800data.c_str());
 
 		if (sim800data.indexOf(F("+CMTI:")) != -1 || smsReceived)
 		{

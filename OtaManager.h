@@ -23,8 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define _OTAMANAGER_h
 
 #define HOSTNAME "ESP8266-OTA-"
-#define VERSION "1.00"
-
 #define SSID_PSWD_ADDRESS 0x0024
 
 #include <ESP8266WiFi.h>
@@ -48,7 +46,7 @@ protected:
 	String password = "";
 
 	// Web returning function in Web mode
-	static void handleRoot();
+	static void handleRoot(void);
 
 	// Launch Access Point mode
 	void AccessPointOTA(void);
@@ -59,6 +57,8 @@ protected:
 	// Set http registration routes
 	void registerRoute(void);
 public:
+	typedef String(otaTreatfunction)(String *);
+
 	// Constructor
 	OtaManagerClass(void);
 
@@ -76,7 +76,8 @@ public:
 
 	// Check if WEB mode was launched
 	bool CheckWebState(void);
-};
 
-extern OtaManagerClass otaManager;
+	// Register a special treatment function for web
+	void registerTreatFunction(otaTreatfunction &);
+};
 #endif
