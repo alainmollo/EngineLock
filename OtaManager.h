@@ -49,10 +49,10 @@ protected:
 	static void handleRoot(void);
 
 	// Launch Access Point mode
-	void AccessPointOTA(void);
+	void AccessPoint(void);
 
 	// Launch Appairing mode
-	void AppearingOTA(void);
+	void Appearing(void);
 
 	// Set http registration routes
 	void registerRoute(void);

@@ -104,7 +104,7 @@ void OtaManagerClass::handleRoot() {
 	{
 		String result;
 		Logger.Log(CommandLine.c_str());
-		
+
 		if (_theFunction != NULL)
 			result = (*_theFunction)(&CommandLine);
 
@@ -118,11 +118,11 @@ void OtaManagerClass::handleRoot() {
 }
 
 // Prepare OTA in Access Point Mode
-void OtaManagerClass::AccessPointOTA()
+void OtaManagerClass::AccessPoint()
 {
-	Logger.Log(F("Ota Access Point"));
+	Logger.Log(F("Access Point"));
 	WiFi.mode(WIFI_AP);
-
+	WiFi.setOutputPower(0);
 	WiFi.softAPConfig(ip, gateway, subnet);
 	boolean apsuccess = WiFi.softAP(mySsid, password.c_str());
 
@@ -131,8 +131,9 @@ void OtaManagerClass::AccessPointOTA()
 		// Wait for connection
 		String st;
 		st = "";
-		while (WiFi.softAPgetStationNum() == 0) {
-			delay(500);
+		int cwifi = 0;
+		while (WiFi.softAPgetStationNum() == 0 && cwifi++ < 150) {
+			delay(200);
 			st += ".";
 			display.clear();
 			display.drawString(64, 10, "Access Point");
@@ -152,12 +153,21 @@ void OtaManagerClass::AccessPointOTA()
 			delay(10);
 		}
 
-		Logger.Log(F("Ota AP Ok..."));
-		OtaState = true;
+		if (cwifi < 151)
+			Logger.Log(F("Access Point Ok..."));
+		else
+		{
+			Logger.Log(F("Access Point failed..."));
+			display.clear();
+			display.drawString(64, 20, "Access Point");
+			display.drawString(64, 40, "failed...");
+			display.display();
+			delay(1000);
+		}
 	}
 	else
 	{
-		Logger.Log(F("Ota cannot be AP"));
+		Logger.Log(F("Access Point throw Error"));
 
 		// Access point was unavaible => Restart...
 		display.clear();
@@ -171,9 +181,9 @@ void OtaManagerClass::AccessPointOTA()
 }
 
 // OTA in Appearing Mode
-void OtaManagerClass::AppearingOTA()
+void OtaManagerClass::Appearing()
 {
-	Logger.Log(F("Ota Appearing"));
+	Logger.Log(F("Appearing"));
 
 	display.clear();
 	display.drawString(64, 10, "Connecting to");
@@ -181,47 +191,51 @@ void OtaManagerClass::AppearingOTA()
 	display.display();
 	delay(10);
 
-	WiFi.mode(WIFI_STA);
-
-	WiFi.begin(ssid.c_str(), password.c_str());
-
 	// Wait for connection
 	String st;
 	st = "";
-	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		st += ".";
-		display.drawString(64, 40, st);
-		display.display();
-		if (st.length() > 30)
-		{
-			st = ".";
-			display.clear();
-			display.drawString(64, 10, "Connecting to");
-			display.drawString(64, 30, ssid);
+	int cmaster = 0;
+	while (WiFi.status() != WL_CONNECTED && cmaster++ < 3)
+	{
+		WiFi.mode(WIFI_STA);		
+		WiFi.setOutputPower(0);
+		WiFi.begin(ssid.c_str(), password.c_str());
+		byte cwifi = 0;
+		while (WiFi.status() != WL_CONNECTED && cwifi++ < 60) {
+			delay(100);
+			WiFi.begin(ssid.c_str(), password.c_str());
+			st += ".";
 			display.drawString(64, 40, st);
 			display.display();
+			if (st.length() > 30)
+			{
+				st = ".";
+				display.clear();
+				display.drawString(64, 10, "Connecting to");
+				display.drawString(64, 30, ssid);
+				display.drawString(64, 40, st);
+				display.display();
+				delay(10);
+			}
 			delay(10);
 		}
-		delay(10);
 	}
 
-	Logger.Log(F("Ota Appearing Ok..."));
-	OtaState = true;
+	if (cmaster < 4)
+		Logger.Log(F("Appearing Ok..."));
+	else
+	{
+		Logger.Log(F("Access Point failed..."));
+		display.clear();
+		display.drawString(64, 20, "Access Point");
+		display.drawString(64, 40, "failed...");
+		display.display();
+		delay(1000);
+	}
 }
 
 // Ota mechanism
 void OtaManagerClass::Ota(bool fromCommand) {
-	if (WiFi.isConnected())
-	{
-		Logger.Log(F("Always connected..."));
-		Logger.Log(F("Reset connection !"));
-		WiFi.disconnect(true);
-		delay(1000);
-		WiFi.begin();
-	}
-
-	// Read configuration
 	int adress = SSID_PSWD_ADDRESS;
 	char read;
 	while ((read = EepromDs3231Class::i2c_eeprom_read_byte(0x57, adress++)) != 0xFF && adress < 0x00FA)
@@ -242,7 +256,10 @@ void OtaManagerClass::Ota(bool fromCommand) {
 	delay(1000);
 	// if we stay pressed D3 => Accesspoint OTA also Appearing OTA
 	if (digitalRead(D3) == 1 && !fromCommand)
-		AccessPointOTA();
+	{
+		AccessPoint();
+		OtaState = true;
+	}
 	else
 	{
 		Logger.Log(F("SSID/PSWD:"), false);
@@ -250,7 +267,8 @@ void OtaManagerClass::Ota(bool fromCommand) {
 		Logger.Log(F("/"), false);
 		Logger.Log(password.c_str());
 
-		AppearingOTA();
+		Appearing();
+		OtaState = true;
 	}
 
 	MDNS.begin(HOSTNAME);
@@ -287,15 +305,6 @@ void OtaManagerClass::Ota(bool fromCommand) {
 // Set Web Mode
 void OtaManagerClass::Web(bool fromCommand)
 {
-	if (WiFi.isConnected())
-	{
-		Logger.Log(F("Always connected..."));
-		Logger.Log(F("Reset connection !"));
-		WiFi.disconnect(true);
-		delay(1000);
-		WiFi.begin();
-	}
-
 	// Read configuration
 	int adress = SSID_PSWD_ADDRESS;
 	char read;
@@ -310,104 +319,22 @@ void OtaManagerClass::Web(bool fromCommand)
 		delay(10);
 	}
 
-	if (fromCommand)
-	{
-		Logger.Log(F("Web Station"));
-		WiFi.mode(WIFI_STA);
+	String hostname(HOSTNAME);
+	hostname += String(ESP.getChipId(), HEX);
+	WiFi.hostname(hostname);
 
+	delay(1000);
+	// if we stay pressed D3 => Accesspoint OTA also Appearing OTA
+	if (!fromCommand)
+		AccessPoint();
+	else
+	{
 		Logger.Log(F("SSID/PSWD:"), false);
 		Logger.Log(ssid.c_str(), false);
 		Logger.Log(F("/"), false);
 		Logger.Log(password.c_str());
 
-		String hostname(HOSTNAME);
-		hostname += String(ESP.getChipId(), HEX);
-		WiFi.hostname(hostname);
-
-		Logger.Log(F("Web Appearing"));
-
-		display.clear();
-		display.drawString(64, 10, "Connecting to");
-		display.drawString(64, 30, ssid);
-		display.display();
-		delay(10);
-
-		WiFi.begin(ssid.c_str(), password.c_str());
-		// Wait for connection
-		String st;
-		st = "";
-		while (WiFi.status() != WL_CONNECTED) {
-			delay(500);
-			st += ".";
-			display.drawString(64, 40, st);
-			display.display();
-			if (st.length() > 30)
-			{
-				st = ".";
-				display.clear();
-				display.drawString(64, 10, "Connecting to");
-				display.drawString(64, 30, ssid);
-				display.drawString(64, 40, st);
-				display.display();
-				delay(10);
-			}
-			delay(10);
-		}
-	}
-	else
-	{
-		Logger.Log(F("Web Access Point"));
-		WiFi.mode(WIFI_AP);
-
-		String hostname(HOSTNAME);
-		hostname += String(ESP.getChipId(), HEX);
-		WiFi.hostname(hostname);
-
-		WiFi.softAPConfig(ip, gateway, subnet);
-		boolean apsuccess = WiFi.softAP(mySsid, password.c_str());
-
-		if (apsuccess)
-		{
-			// Wait for connection
-			String st;
-			st = "";
-			while (WiFi.softAPgetStationNum() == 0) {
-				delay(500);
-				st += ".";
-				display.clear();
-				display.drawString(64, 10, "Access Point");
-				display.drawString(64, 30, WiFi.softAPIP().toString());
-				display.drawString(64, 40, st);
-				display.display();
-				if (st.length() > 30)
-				{
-					st = ".";
-					display.clear();
-					display.drawString(64, 10, "Access Point");
-					display.drawString(64, 30, WiFi.softAPIP().toString());
-					display.drawString(64, 40, st);
-					display.display();
-					delay(10);
-				}
-				delay(10);
-			}
-
-			Logger.Log(F("Web AP Ok..."));
-			WebState = true;
-		}
-		else
-		{
-			Logger.Log(F("Web cannot be AP"));
-
-			// Access point was unavaible => Restart...
-			display.clear();
-			display.drawString(64, 10, "Error");
-			display.drawString(64, 30, "occured.");
-			display.drawString(64, 50, "Restarting...");
-			display.display();
-			delay(1000);
-			ESP.restart();
-		}
+		Appearing();
 	}
 
 	MDNS.begin(HOSTNAME);
@@ -423,6 +350,7 @@ void OtaManagerClass::Web(bool fromCommand)
 	WebState = true;
 }
 
+// Register web root for http action
 void OtaManagerClass::registerRoute()
 {
 	server.on("/", handleRoot);
@@ -431,6 +359,7 @@ void OtaManagerClass::registerRoute()
 	});
 }
 
+// Register the CommandManager function to launch command treatment
 void OtaManagerClass::registerTreatFunction(otaTreatfunction & theFunction)
 {
 	_theFunction = &theFunction;

@@ -491,6 +491,40 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return ReplyToSender(retour, Who, From);
 	}
 
+	// Format SPIFF file system
+	if (AnalyseSms(Message, F("SPIFCLR")))
+	{
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("SPIFF Clearing"));
+		display.display();
+		display.lockDisplay();
+
+		SPIFFS.begin();
+		SPIFFS.format();
+
+		return ReplyToSender(F("OK"), Who, From);
+	}
+
+	// Read log from file system
+	if (AnalyseSms(Message, F("SPIFRD")))
+	{
+		display.clear();
+		display.drawString(DISPLAY_WIDTH / 2, 20, F("SPIFF Reading"));
+		display.display();
+		display.lockDisplay();
+
+		SPIFFS.begin();
+		fs::File f = SPIFFS.open("/log.txt", "r");
+		if (!f) {
+			Logger.Log(F("file open failed"));
+			return ReplyToSender(F("Failed to open !"), Who, From);
+		}
+		String result = f.readString();
+		f.close();
+
+		return ReplyToSender(result, Who, From);
+	}
+
 	// Read phone number of manager (ME)
 	// RNUMEND#1111
 	if (AnalyseSms(Message, F("RMNG")))
@@ -888,5 +922,38 @@ void CommandManagerClass::setWebBuffer(String answer)
 // Make an entry log for authorized tag
 void CommandManagerClass::logOneEntry(RtcDateTime now, uint8 * tagid)
 {
-	//TODO
+	Logger.Log(F("Save log Entry..."));
+	fs::File f = SPIFFS.open("/log.txt", "a");
+	if (!f) {
+		Logger.Log(F("file open failed"));
+		return;
+	}
+	char datestring[11];
+	char timestring[9];
+
+	snprintf_P(datestring,
+		countof(datestring),
+		PSTR("%02u/%02u/%04u"),
+		now.Day(),
+		now.Month(),
+		now.Year());
+	snprintf_P(timestring,
+		countof(timestring),
+		PSTR("%02u:%02u:%02u"),
+		now.Hour(),
+		now.Minute(),
+		now.Second());
+	String logdisp;
+	logdisp = datestring;
+	logdisp += F(";");
+	logdisp += timestring;
+	logdisp += F("#");
+
+	for (int j = 0; j < RFID_MAX_LEN; j++)
+	{
+		logdisp += String(*(tagid + j), HEX);
+	}
+	logdisp += F("\r\n");
+	f.println(logdisp);
+	f.close();
 }
