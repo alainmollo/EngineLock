@@ -6,4 +6,5 @@ TODO:
 #- Gérer le ring => electronique ? sur D3, prendre en compte le boot
 #- Prendre en compte les numéros de carte complets et non pas que sur 4 octets
 #- Paramétrer l'accès wifi du mode appairing par ligne de commande
-- logger les badgeages et les envoyers au serveur par SMS
+#- logger les badgeages et les envoyers au serveur par SMS
+- Pouvoir écrire et lire un fichier nommé dans le SPIFF

@@ -49,10 +49,10 @@ protected:
 	static void handleRoot(void);
 
 	// Launch Access Point mode
-	void AccessPoint(void);
+	bool AccessPoint(void);
 
 	// Launch Appairing mode
-	void Appearing(void);
+	bool Appearing(void);
 
 	// Set http registration routes
 	void registerRoute(void);
@@ -66,10 +66,12 @@ public:
 	void Refresh(void);
 
 	// Set OTA mode with appairing or acces point style
-	void Ota(bool);
+	bool Ota(bool);
 
 	// Set Web mode appairing or acces point style
-	void Web(bool);
+	bool Web(bool);
+
+	String Scan(void);
 
 	// Check if OTA mode was launched
 	bool CheckOtaState(void);

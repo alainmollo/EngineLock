@@ -128,6 +128,14 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		return true;
 	}
 
+	// Ask the planning
+	// ASKEND#
+	if (AnalyseSms(Message, F("SCAN")))
+	{
+		String result = otaManager->Scan();
+		return ReplyToSender(result.c_str(), Who, From);;
+	}
+
 	// Reset the system
 	// CLREND#440
 	if (AnalyseSms(Message, F("CLR")))
@@ -160,43 +168,59 @@ bool CommandManagerClass::LaunchCommand(String * Message, String * Who, uint8_t 
 		Logger.Log(F(""));
 		Logger.Log(F("Clear ended"));
 
-		return ReplyToSender(F("Memory was cleared..."), Who, From);;
+		return ReplyToSender(F("Memory was cleared..."), Who, From);
 	}
 
 	// Launch OTA Mode in access point
 	// OTAAPEND#
 	if (AnalyseSms(Message, F("OTAAP")))
 	{
-		otaManager->Ota(false);
-
-		return ReplyToSender(F("OTA AP was launched..."), Who, From);
+		if (otaManager->Ota(false))
+		{
+			String result = "OTA AP Ok : " + WiFi.localIP().toString();
+			return ReplyToSender(result, Who, From);
+		}
+		else
+			return ReplyToSender(F("OTA AP failed..."), Who, From);
 	}
 
 	// Launch OTA Mode in station
 	// OTASTAEND#
 	if (AnalyseSms(Message, F("OTASTA")))
 	{
-		otaManager->Ota(true);
-
-		return ReplyToSender(F("OTA STA was launched..."), Who, From);
+		if (otaManager->Ota(true))
+		{
+			String result = "OTA STA Ok : " + WiFi.localIP().toString();
+			return ReplyToSender(result, Who, From);
+		}
+		else
+			return ReplyToSender(F("OTA STA failed..."), Who, From);
 	}
 
 	// Launch Web Mode
 	// WEBAPEND#
 	if (AnalyseSms(Message, F("WEBAP")))
 	{
-		otaManager->Web(false);
-
-		return ReplyToSender(F("WEB was launched..."), Who, From);
+		if (otaManager->Web(false))
+		{
+			String result = "WEB AP Ok : " + WiFi.localIP().toString();
+			return ReplyToSender(result, Who, From);
+		}
+		else
+			return ReplyToSender(F("WEB failed..."), Who, From);
 	}
 
 	// Launch Web Mode
 	// WEBSTAEND#
 	if (AnalyseSms(Message, F("WEBSTA")))
 	{
-		otaManager->Web(true);
-
-		return ReplyToSender(F("WEB was launched..."), Who, From);
+		if (otaManager->Web(true))
+		{
+			String result = "WEB STA Ok : " + WiFi.localIP().toString();
+			return ReplyToSender(result, Who, From);
+		}
+		else
+			return ReplyToSender(F("WEB failed..."), Who, From);
 	}
 
 	// Unlock engine
@@ -953,7 +977,6 @@ void CommandManagerClass::logOneEntry(RtcDateTime now, uint8 * tagid)
 	{
 		logdisp += String(*(tagid + j), HEX);
 	}
-	logdisp += F("\r\n");
 	f.println(logdisp);
 	f.close();
 }

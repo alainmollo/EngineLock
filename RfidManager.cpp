@@ -30,6 +30,7 @@ bool RfidManagerClass::CheckRfid(uint8 * rfidCard)
 	// Check if data arrived from Rfid sensor
 	if (this->available())
 	{
+		Logger.Log(F("CheckRfid was lauchned"));
 		uint8 readchar;
 		byte _count = 0;
 		while (this->available() && (readchar = this->read()) != 3)

@@ -785,7 +785,7 @@ bool Sim800L::checkSMS(void)
 }
 
 // Sim800L hardwware ring signal interruption, just to wake up arduino when SMS received
-void Sim800L::ringinterrupt(void)
+void ICACHE_RAM_ATTR Sim800L::ringinterrupt(void)
 {
 	Logger.Log(F("Ring..."));
 	smsReceived = true;
